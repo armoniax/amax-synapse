@@ -30,7 +30,7 @@ from typing import (
 from synapse.api.errors import Codes
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.media_storage import ReadableFileWrapper
-from synapse.spam_checker_api import ALLOW, Decision, RegistrationBehaviour
+from synapse.spam_checker_api import ALLOW, Allow, Decision, RegistrationBehaviour
 from synapse.types import RoomAlias, UserProfile
 from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
 
@@ -45,28 +45,28 @@ DEPRECATED_BOOL = bool
 
 CHECK_EVENT_FOR_SPAM_CALLBACK = Callable[
     ["synapse.events.EventBase"],
-    Awaitable[Union[ALLOW, Codes, str, DEPRECATED_BOOL]],
+    Awaitable[Union[Allow, Codes, str, DEPRECATED_BOOL]],
 ]
 USER_MAY_JOIN_ROOM_CALLBACK = Callable[
-    [str, str, bool], Awaitable[Union[ALLOW, Codes, DEPRECATED_BOOL]]
+    [str, str, bool], Awaitable[Union[Allow, Codes, DEPRECATED_BOOL]]
 ]
 USER_MAY_INVITE_CALLBACK = Callable[
-    [str, str, str], Awaitable[Union[ALLOW, Codes, DEPRECATED_BOOL]]
+    [str, str, str], Awaitable[Union[Allow, Codes, DEPRECATED_BOOL]]
 ]
 USER_MAY_SEND_3PID_INVITE_CALLBACK = Callable[
-    [str, str, str, str], Awaitable[Union[ALLOW, Codes, DEPRECATED_BOOL]]
+    [str, str, str, str], Awaitable[Union[Allow, Codes, DEPRECATED_BOOL]]
 ]
 USER_MAY_CREATE_ROOM_CALLBACK = Callable[
-    [str], Awaitable[Union[ALLOW, Codes, DEPRECATED_BOOL]]
+    [str], Awaitable[Union[Allow, Codes, DEPRECATED_BOOL]]
 ]
 USER_MAY_CREATE_ROOM_ALIAS_CALLBACK = Callable[
-    [str, RoomAlias], Awaitable[Union[ALLOW, Codes, DEPRECATED_BOOL]]
+    [str, RoomAlias], Awaitable[Union[Allow, Codes, DEPRECATED_BOOL]]
 ]
 USER_MAY_PUBLISH_ROOM_CALLBACK = Callable[
-    [str, str], Awaitable[Union[ALLOW, Codes, DEPRECATED_BOOL]]
+    [str, str], Awaitable[Union[Allow, Codes, DEPRECATED_BOOL]]
 ]
 CHECK_USERNAME_FOR_SPAM_CALLBACK = Callable[
-    [UserProfile], Awaitable[Union[ALLOW, Codes, DEPRECATED_BOOL]]
+    [UserProfile], Awaitable[Union[Allow, Codes, DEPRECATED_BOOL]]
 ]
 LEGACY_CHECK_REGISTRATION_FOR_SPAM_CALLBACK = Callable[
     [
@@ -87,7 +87,7 @@ CHECK_REGISTRATION_FOR_SPAM_CALLBACK = Callable[
 ]
 CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK = Callable[
     [ReadableFileWrapper, FileInfo],
-    Awaitable[Union[ALLOW, Codes, DEPRECATED_BOOL]],
+    Awaitable[Union[Allow, Codes, DEPRECATED_BOOL]],
 ]
 
 
@@ -258,7 +258,7 @@ class SpamChecker:
 
     async def check_event_for_spam(
         self, event: "synapse.events.EventBase"
-    ) -> Union[ALLOW, Codes, str]:
+    ) -> Union[Allow, Codes, str]:
         """Checks if a given event is considered "spammy" by this server.
 
         If the server considers an event spammy, then it will be rejected if
@@ -277,7 +277,7 @@ class SpamChecker:
                 message.
         """
         for callback in self._check_event_for_spam_callbacks:
-            res: Union[ALLOW, Codes, str, DEPRECATED_BOOL] = await delay_cancellation(
+            res: Union[Allow, Codes, str, DEPRECATED_BOOL] = await delay_cancellation(
                 callback(event)
             )
             if res is False or res is ALLOW:
@@ -424,7 +424,7 @@ class SpamChecker:
 
     async def user_may_publish_room(
         self, userid: str, room_id: str
-    ) -> Union[ALLOW, Codes, DEPRECATED_BOOL]:
+    ) -> Union[Allow, Codes, DEPRECATED_BOOL]:
         """Checks if a given user may publish a room to the directory
 
         Args:
