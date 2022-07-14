@@ -18,15 +18,18 @@
 """Tests REST events for /rooms paths."""
 
 import json
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Union
 from unittest.mock import Mock, call
 from urllib import parse as urlparse
 
-from twisted.internet import defer
+# `Literal` appears with Python 3.8.
+from typing_extensions import Literal
+
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.api.constants import (
+    EduTypes,
     EventContentFields,
     EventTypes,
     Membership,
@@ -42,6 +45,7 @@ from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
 from tests import unittest
+from tests.http.server._base import make_request_with_cancellation_test
 from tests.test_utils import make_awaitable
 
 PATH_PREFIX = b"/_matrix/client/api/v1"
@@ -471,6 +475,49 @@ class RoomPermissionsTestCase(RoomBase):
         )
 
 
+class RoomStateTestCase(RoomBase):
+    """Tests /rooms/$room_id/state."""
+
+    user_id = "@sid1:red"
+
+    def test_get_state_cancellation(self) -> None:
+        """Test cancellation of a `/rooms/$room_id/state` request."""
+        room_id = self.helper.create_room_as(self.user_id)
+        channel = make_request_with_cancellation_test(
+            "test_state_cancellation",
+            self.reactor,
+            self.site,
+            "GET",
+            "/rooms/%s/state" % room_id,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertCountEqual(
+            [state_event["type"] for state_event in channel.json_body],
+            {
+                "m.room.create",
+                "m.room.power_levels",
+                "m.room.join_rules",
+                "m.room.member",
+                "m.room.history_visibility",
+            },
+        )
+
+    def test_get_state_event_cancellation(self) -> None:
+        """Test cancellation of a `/rooms/$room_id/state/$event_type` request."""
+        room_id = self.helper.create_room_as(self.user_id)
+        channel = make_request_with_cancellation_test(
+            "test_state_cancellation",
+            self.reactor,
+            self.site,
+            "GET",
+            "/rooms/%s/state/m.room.member/%s" % (room_id, self.user_id),
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(channel.json_body, {"membership": "join"})
+
+
 class RoomsMemberListTestCase(RoomBase):
     """Tests /rooms/$room_id/members/list REST events."""
 
@@ -591,6 +638,62 @@ class RoomsMemberListTestCase(RoomBase):
         channel = self.make_request("GET", room_path)
         self.assertEqual(200, channel.code, msg=channel.result["body"])
 
+    def test_get_member_list_cancellation(self) -> None:
+        """Test cancellation of a `/rooms/$room_id/members` request."""
+        room_id = self.helper.create_room_as(self.user_id)
+        channel = make_request_with_cancellation_test(
+            "test_get_member_list_cancellation",
+            self.reactor,
+            self.site,
+            "GET",
+            "/rooms/%s/members" % room_id,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(len(channel.json_body["chunk"]), 1)
+        self.assertLessEqual(
+            {
+                "content": {"membership": "join"},
+                "room_id": room_id,
+                "sender": self.user_id,
+                "state_key": self.user_id,
+                "type": "m.room.member",
+                "user_id": self.user_id,
+            }.items(),
+            channel.json_body["chunk"][0].items(),
+        )
+
+    def test_get_member_list_with_at_token_cancellation(self) -> None:
+        """Test cancellation of a `/rooms/$room_id/members?at=<sync token>` request."""
+        room_id = self.helper.create_room_as(self.user_id)
+
+        # first sync to get an at token
+        channel = self.make_request("GET", "/sync")
+        self.assertEqual(200, channel.code)
+        sync_token = channel.json_body["next_batch"]
+
+        channel = make_request_with_cancellation_test(
+            "test_get_member_list_with_at_token_cancellation",
+            self.reactor,
+            self.site,
+            "GET",
+            "/rooms/%s/members?at=%s" % (room_id, sync_token),
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(len(channel.json_body["chunk"]), 1)
+        self.assertLessEqual(
+            {
+                "content": {"membership": "join"},
+                "room_id": room_id,
+                "sender": self.user_id,
+                "state_key": self.user_id,
+                "type": "m.room.member",
+                "user_id": self.user_id,
+            }.items(),
+            channel.json_body["chunk"][0].items(),
+        )
+
 
 class RoomsCreateTestCase(RoomBase):
     """Tests /rooms and /rooms/$room_id REST events."""
@@ -677,9 +780,11 @@ class RoomsCreateTestCase(RoomBase):
         channel = self.make_request("POST", "/createRoom", content)
         self.assertEqual(200, channel.code)
 
-    def test_spam_checker_may_join_room(self) -> None:
+    def test_spam_checker_may_join_room_deprecated(self) -> None:
         """Tests that the user_may_join_room spam checker callback is correctly bypassed
         when creating a new room.
+
+        In this test, we use the deprecated API in which callbacks return a bool.
         """
 
         async def user_may_join_room(
@@ -688,6 +793,32 @@ class RoomsCreateTestCase(RoomBase):
             is_invite: bool,
         ) -> bool:
             return False
+
+        join_mock = Mock(side_effect=user_may_join_room)
+        self.hs.get_spam_checker()._user_may_join_room_callbacks.append(join_mock)
+
+        channel = self.make_request(
+            "POST",
+            "/createRoom",
+            {},
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        self.assertEqual(join_mock.call_count, 0)
+
+    def test_spam_checker_may_join_room(self) -> None:
+        """Tests that the user_may_join_room spam checker callback is correctly bypassed
+        when creating a new room.
+
+        In this test, we use the more recent API in which callbacks return a `Union[Codes, Literal["NOT_SPAM"]]`.
+        """
+
+        async def user_may_join_room(
+            mxid: str,
+            room_id: str,
+            is_invite: bool,
+        ) -> Codes:
+            return Codes.CONSENT_NOT_GIVEN
 
         join_mock = Mock(side_effect=user_may_join_room)
         self.hs.get_spam_checker()._user_may_join_room_callbacks.append(join_mock)
@@ -911,9 +1042,11 @@ class RoomJoinTestCase(RoomBase):
         self.room2 = self.helper.create_room_as(room_creator=self.user1, tok=self.tok1)
         self.room3 = self.helper.create_room_as(room_creator=self.user1, tok=self.tok1)
 
-    def test_spam_checker_may_join_room(self) -> None:
+    def test_spam_checker_may_join_room_deprecated(self) -> None:
         """Tests that the user_may_join_room spam checker callback is correctly called
         and blocks room joins when needed.
+
+        This test uses the deprecated API, in which callbacks return booleans.
         """
 
         # Register a dummy callback. Make it allow all room joins for now.
@@ -926,7 +1059,9 @@ class RoomJoinTestCase(RoomBase):
         ) -> bool:
             return return_value
 
-        callback_mock = Mock(side_effect=user_may_join_room)
+        # `spec` argument is needed for this function mock to have `__qualname__`, which
+        # is needed for `Measure` metrics buried in SpamChecker.
+        callback_mock = Mock(side_effect=user_may_join_room, spec=lambda *x: None)
         self.hs.get_spam_checker()._user_may_join_room_callbacks.append(callback_mock)
 
         # Join a first room, without being invited to it.
@@ -966,6 +1101,67 @@ class RoomJoinTestCase(RoomBase):
 
         # Now make the callback deny all room joins, and check that a join actually fails.
         return_value = False
+        self.helper.join(self.room3, self.user2, expect_code=403, tok=self.tok2)
+
+    def test_spam_checker_may_join_room(self) -> None:
+        """Tests that the user_may_join_room spam checker callback is correctly called
+        and blocks room joins when needed.
+
+        This test uses the latest API to this day, in which callbacks return `NOT_SPAM` or `Codes`.
+        """
+
+        # Register a dummy callback. Make it allow all room joins for now.
+        return_value: Union[Literal["NOT_SPAM"], Codes] = synapse.module_api.NOT_SPAM
+
+        async def user_may_join_room(
+            userid: str,
+            room_id: str,
+            is_invited: bool,
+        ) -> Union[Literal["NOT_SPAM"], Codes]:
+            return return_value
+
+        # `spec` argument is needed for this function mock to have `__qualname__`, which
+        # is needed for `Measure` metrics buried in SpamChecker.
+        callback_mock = Mock(side_effect=user_may_join_room, spec=lambda *x: None)
+        self.hs.get_spam_checker()._user_may_join_room_callbacks.append(callback_mock)
+
+        # Join a first room, without being invited to it.
+        self.helper.join(self.room1, self.user2, tok=self.tok2)
+
+        # Check that the callback was called with the right arguments.
+        expected_call_args = (
+            (
+                self.user2,
+                self.room1,
+                False,
+            ),
+        )
+        self.assertEqual(
+            callback_mock.call_args,
+            expected_call_args,
+            callback_mock.call_args,
+        )
+
+        # Join a second room, this time with an invite for it.
+        self.helper.invite(self.room2, self.user1, self.user2, tok=self.tok1)
+        self.helper.join(self.room2, self.user2, tok=self.tok2)
+
+        # Check that the callback was called with the right arguments.
+        expected_call_args = (
+            (
+                self.user2,
+                self.room2,
+                True,
+            ),
+        )
+        self.assertEqual(
+            callback_mock.call_args,
+            expected_call_args,
+            callback_mock.call_args,
+        )
+
+        # Now make the callback deny all room joins, and check that a join actually fails.
+        return_value = Codes.CONSENT_NOT_GIVEN
         self.helper.join(self.room3, self.user2, expect_code=403, tok=self.tok2)
 
 
@@ -1117,6 +1313,264 @@ class RoomMessagesTestCase(RoomBase):
         self.assertEqual(200, channel.code, msg=channel.result["body"])
 
 
+class RoomPowerLevelOverridesTestCase(RoomBase):
+    """Tests that the power levels can be overridden with server config."""
+
+    user_id = "@sid1:red"
+
+    servlets = [
+        admin.register_servlets,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.admin_user_id = self.register_user("admin", "pass")
+        self.admin_access_token = self.login("admin", "pass")
+
+    def power_levels(self, room_id: str) -> Dict[str, Any]:
+        return self.helper.get_state(
+            room_id, "m.room.power_levels", self.admin_access_token
+        )
+
+    def test_default_power_levels_with_room_override(self) -> None:
+        """
+        Create a room, providing power level overrides.
+        Confirm that the room's power levels reflect the overrides.
+
+        See https://github.com/matrix-org/matrix-spec/issues/492
+        - currently we overwrite each key of power_level_content_override
+        completely.
+        """
+
+        room_id = self.helper.create_room_as(
+            self.user_id,
+            extra_content={
+                "power_level_content_override": {"events": {"custom.event": 0}}
+            },
+        )
+        self.assertEqual(
+            {
+                "custom.event": 0,
+            },
+            self.power_levels(room_id)["events"],
+        )
+
+    @unittest.override_config(
+        {
+            "default_power_level_content_override": {
+                "public_chat": {"events": {"custom.event": 0}},
+            }
+        },
+    )
+    def test_power_levels_with_server_override(self) -> None:
+        """
+        With a server configured to modify the room-level defaults,
+        Create a room, without providing any extra power level overrides.
+        Confirm that the room's power levels reflect the server-level overrides.
+
+        Similar to https://github.com/matrix-org/matrix-spec/issues/492,
+        we overwrite each key of power_level_content_override completely.
+        """
+
+        room_id = self.helper.create_room_as(self.user_id)
+        self.assertEqual(
+            {
+                "custom.event": 0,
+            },
+            self.power_levels(room_id)["events"],
+        )
+
+    @unittest.override_config(
+        {
+            "default_power_level_content_override": {
+                "public_chat": {
+                    "events": {"server.event": 0},
+                    "ban": 13,
+                },
+            }
+        },
+    )
+    def test_power_levels_with_server_and_room_overrides(self) -> None:
+        """
+        With a server configured to modify the room-level defaults,
+        create a room, providing different overrides.
+        Confirm that the room's power levels reflect both overrides, and
+        choose the room overrides where they clash.
+        """
+
+        room_id = self.helper.create_room_as(
+            self.user_id,
+            extra_content={
+                "power_level_content_override": {"events": {"room.event": 0}}
+            },
+        )
+
+        # Room override wins over server config
+        self.assertEqual(
+            {"room.event": 0},
+            self.power_levels(room_id)["events"],
+        )
+
+        # But where there is no room override, server config wins
+        self.assertEqual(13, self.power_levels(room_id)["ban"])
+
+
+class RoomPowerLevelOverridesInPracticeTestCase(RoomBase):
+    """
+    Tests that we can really do various otherwise-prohibited actions
+    based on overriding the power levels in config.
+    """
+
+    user_id = "@sid1:red"
+
+    def test_creator_can_post_state_event(self) -> None:
+        # Given I am the creator of a room
+        room_id = self.helper.create_room_as(self.user_id)
+
+        # When I send a state event
+        path = "/rooms/{room_id}/state/custom.event/my_state_key".format(
+            room_id=urlparse.quote(room_id),
+        )
+        channel = self.make_request("PUT", path, "{}")
+
+        # Then I am allowed
+        self.assertEqual(200, channel.code, msg=channel.result["body"])
+
+    def test_normal_user_can_not_post_state_event(self) -> None:
+        # Given I am a normal member of a room
+        room_id = self.helper.create_room_as("@some_other_guy:red")
+        self.helper.join(room=room_id, user=self.user_id)
+
+        # When I send a state event
+        path = "/rooms/{room_id}/state/custom.event/my_state_key".format(
+            room_id=urlparse.quote(room_id),
+        )
+        channel = self.make_request("PUT", path, "{}")
+
+        # Then I am not allowed because state events require PL>=50
+        self.assertEqual(403, channel.code, msg=channel.result["body"])
+        self.assertEqual(
+            "You don't have permission to post that to the room. "
+            "user_level (0) < send_level (50)",
+            channel.json_body["error"],
+        )
+
+    @unittest.override_config(
+        {
+            "default_power_level_content_override": {
+                "public_chat": {"events": {"custom.event": 0}},
+            }
+        },
+    )
+    def test_with_config_override_normal_user_can_post_state_event(self) -> None:
+        # Given the server has config allowing normal users to post my event type,
+        # and I am a normal member of a room
+        room_id = self.helper.create_room_as("@some_other_guy:red")
+        self.helper.join(room=room_id, user=self.user_id)
+
+        # When I send a state event
+        path = "/rooms/{room_id}/state/custom.event/my_state_key".format(
+            room_id=urlparse.quote(room_id),
+        )
+        channel = self.make_request("PUT", path, "{}")
+
+        # Then I am allowed
+        self.assertEqual(200, channel.code, msg=channel.result["body"])
+
+    @unittest.override_config(
+        {
+            "default_power_level_content_override": {
+                "public_chat": {"events": {"custom.event": 0}},
+            }
+        },
+    )
+    def test_any_room_override_defeats_config_override(self) -> None:
+        # Given the server has config allowing normal users to post my event type
+        # And I am a normal member of a room
+        # But the room was created with special permissions
+        extra_content: Dict[str, Any] = {
+            "power_level_content_override": {"events": {}},
+        }
+        room_id = self.helper.create_room_as(
+            "@some_other_guy:red", extra_content=extra_content
+        )
+        self.helper.join(room=room_id, user=self.user_id)
+
+        # When I send a state event
+        path = "/rooms/{room_id}/state/custom.event/my_state_key".format(
+            room_id=urlparse.quote(room_id),
+        )
+        channel = self.make_request("PUT", path, "{}")
+
+        # Then I am not allowed
+        self.assertEqual(403, channel.code, msg=channel.result["body"])
+
+    @unittest.override_config(
+        {
+            "default_power_level_content_override": {
+                "public_chat": {"events": {"custom.event": 0}},
+            }
+        },
+    )
+    def test_specific_room_override_defeats_config_override(self) -> None:
+        # Given the server has config allowing normal users to post my event type,
+        # and I am a normal member of a room,
+        # but the room was created with special permissions for this event type
+        extra_content = {
+            "power_level_content_override": {"events": {"custom.event": 1}},
+        }
+        room_id = self.helper.create_room_as(
+            "@some_other_guy:red", extra_content=extra_content
+        )
+        self.helper.join(room=room_id, user=self.user_id)
+
+        # When I send a state event
+        path = "/rooms/{room_id}/state/custom.event/my_state_key".format(
+            room_id=urlparse.quote(room_id),
+        )
+        channel = self.make_request("PUT", path, "{}")
+
+        # Then I am not allowed
+        self.assertEqual(403, channel.code, msg=channel.result["body"])
+        self.assertEqual(
+            "You don't have permission to post that to the room. "
+            + "user_level (0) < send_level (1)",
+            channel.json_body["error"],
+        )
+
+    @unittest.override_config(
+        {
+            "default_power_level_content_override": {
+                "public_chat": {"events": {"custom.event": 0}},
+                "private_chat": None,
+                "trusted_private_chat": None,
+            }
+        },
+    )
+    def test_config_override_applies_only_to_specific_preset(self) -> None:
+        # Given the server has config for public_chats,
+        # and I am a normal member of a private_chat room
+        room_id = self.helper.create_room_as("@some_other_guy:red", is_public=False)
+        self.helper.invite(room=room_id, src="@some_other_guy:red", targ=self.user_id)
+        self.helper.join(room=room_id, user=self.user_id)
+
+        # When I send a state event
+        path = "/rooms/{room_id}/state/custom.event/my_state_key".format(
+            room_id=urlparse.quote(room_id),
+        )
+        channel = self.make_request("PUT", path, "{}")
+
+        # Then I am not allowed because the public_chat config does not
+        # affect this room, because this room is a private_chat
+        self.assertEqual(403, channel.code, msg=channel.result["body"])
+        self.assertEqual(
+            "You don't have permission to post that to the room. "
+            + "user_level (0) < send_level (50)",
+            channel.json_body["error"],
+        )
+
+
 class RoomInitialSyncTestCase(RoomBase):
     """Tests /rooms/$room_id/initialSync."""
 
@@ -1155,7 +1609,7 @@ class RoomInitialSyncTestCase(RoomBase):
             e["content"]["user_id"]: e for e in channel.json_body["presence"]
         }
         self.assertTrue(self.user_id in presence_by_user)
-        self.assertEqual("m.presence", presence_by_user[self.user_id]["type"])
+        self.assertEqual(EduTypes.PRESENCE, presence_by_user[self.user_id]["type"])
 
 
 class RoomMessageListTestCase(RoomBase):
@@ -1426,9 +1880,7 @@ class PublicRoomsTestRemoteSearchFallbackTestCase(unittest.HomeserverTestCase):
 
     def test_simple(self) -> None:
         "Simple test for searching rooms over federation"
-        self.federation_client.get_public_rooms.side_effect = lambda *a, **k: defer.succeed(  # type: ignore[attr-defined]
-            {}
-        )
+        self.federation_client.get_public_rooms.return_value = make_awaitable({})  # type: ignore[attr-defined]
 
         search_filter = {"generic_search_term": "foobar"}
 
@@ -1456,7 +1908,7 @@ class PublicRoomsTestRemoteSearchFallbackTestCase(unittest.HomeserverTestCase):
         # with a 404, when using search filters.
         self.federation_client.get_public_rooms.side_effect = (  # type: ignore[attr-defined]
             HttpResponseException(404, "Not Found", b""),
-            defer.succeed({}),
+            make_awaitable({}),
         )
 
         search_filter = {"generic_search_term": "foobar"}
@@ -2589,9 +3041,14 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
 
         self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
 
-    def test_threepid_invite_spamcheck(self) -> None:
+    def test_threepid_invite_spamcheck_deprecated(self) -> None:
+        """
+        Test allowing/blocking threepid invites with a spam-check module.
+
+        In this test, we use the deprecated API in which callbacks return a bool.
+        """
         # Mock a few functions to prevent the test from failing due to failing to talk to
-        # a remote IS. We keep the mock for _mock_make_and_store_3pid_invite around so we
+        # a remote IS. We keep the mock for make_and_store_3pid_invite around so we
         # can check its call_count later on during the test.
         make_invite_mock = Mock(return_value=make_awaitable(0))
         self.hs.get_room_member_handler()._make_and_store_3pid_invite = make_invite_mock
@@ -2601,7 +3058,9 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
 
         # Add a mock to the spamchecker callbacks for user_may_send_3pid_invite. Make it
         # allow everything for now.
-        mock = Mock(return_value=make_awaitable(True))
+        # `spec` argument is needed for this function mock to have `__qualname__`, which
+        # is needed for `Measure` metrics buried in SpamChecker.
+        mock = Mock(return_value=make_awaitable(True), spec=lambda *x: None)
         self.hs.get_spam_checker()._user_may_send_3pid_invite_callbacks.append(mock)
 
         # Send a 3PID invite into the room and check that it succeeded.
@@ -2628,6 +3087,70 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         # Now change the return value of the callback to deny any invite and test that
         # we can't send the invite.
         mock.return_value = make_awaitable(False)
+        channel = self.make_request(
+            method="POST",
+            path="/rooms/" + self.room_id + "/invite",
+            content={
+                "id_server": "example.com",
+                "id_access_token": "sometoken",
+                "medium": "email",
+                "address": email_to_invite,
+            },
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 403)
+
+        # Also check that it stopped before calling _make_and_store_3pid_invite.
+        make_invite_mock.assert_called_once()
+
+    def test_threepid_invite_spamcheck(self) -> None:
+        """
+        Test allowing/blocking threepid invites with a spam-check module.
+
+        In this test, we use the more recent API in which callbacks return a `Union[Codes, Literal["NOT_SPAM"]]`."""
+        # Mock a few functions to prevent the test from failing due to failing to talk to
+        # a remote IS. We keep the mock for make_and_store_3pid_invite around so we
+        # can check its call_count later on during the test.
+        make_invite_mock = Mock(return_value=make_awaitable(0))
+        self.hs.get_room_member_handler()._make_and_store_3pid_invite = make_invite_mock
+        self.hs.get_identity_handler().lookup_3pid = Mock(
+            return_value=make_awaitable(None),
+        )
+
+        # Add a mock to the spamchecker callbacks for user_may_send_3pid_invite. Make it
+        # allow everything for now.
+        # `spec` argument is needed for this function mock to have `__qualname__`, which
+        # is needed for `Measure` metrics buried in SpamChecker.
+        mock = Mock(
+            return_value=make_awaitable(synapse.module_api.NOT_SPAM),
+            spec=lambda *x: None,
+        )
+        self.hs.get_spam_checker()._user_may_send_3pid_invite_callbacks.append(mock)
+
+        # Send a 3PID invite into the room and check that it succeeded.
+        email_to_invite = "teresa@example.com"
+        channel = self.make_request(
+            method="POST",
+            path="/rooms/" + self.room_id + "/invite",
+            content={
+                "id_server": "example.com",
+                "id_access_token": "sometoken",
+                "medium": "email",
+                "address": email_to_invite,
+            },
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200)
+
+        # Check that the callback was called with the right params.
+        mock.assert_called_with(self.user_id, "email", email_to_invite, self.room_id)
+
+        # Check that the call to send the invite was made.
+        make_invite_mock.assert_called_once()
+
+        # Now change the return value of the callback to deny any invite and test that
+        # we can't send the invite.
+        mock.return_value = make_awaitable(Codes.CONSENT_NOT_GIVEN)
         channel = self.make_request(
             method="POST",
             path="/rooms/" + self.room_id + "/invite",

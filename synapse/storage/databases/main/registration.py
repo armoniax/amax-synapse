@@ -215,7 +215,8 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
     async def is_trial_user(self, user_id: str) -> bool:
         """Checks if user is in the "trial" period, i.e. within the first
-        N days of registration defined by `mau_trial_days` config
+        N days of registration defined by `mau_trial_days` config or the
+        `mau_appservice_trial_days` config.
 
         Args:
             user_id: The user to check for trial status.
@@ -226,7 +227,10 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             return False
 
         now = self._clock.time_msec()
-        trial_duration_ms = self.config.server.mau_trial_days * 24 * 60 * 60 * 1000
+        days = self.config.server.mau_appservice_trial_days.get(
+            info["appservice_id"], self.config.server.mau_trial_days
+        )
+        trial_duration_ms = days * 24 * 60 * 60 * 1000
         is_trial = (now - info["creation_ts"] * 1000) < trial_duration_ms
         return is_trial
 
@@ -1801,19 +1805,8 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
             columns=["creation_ts"],
         )
 
-        # we no longer use refresh tokens, but it's possible that some people
-        # might have a background update queued to build this index. Just
-        # clear the background update.
-        self.db_pool.updates.register_noop_background_update(
-            "refresh_tokens_device_index"
-        )
-
         self.db_pool.updates.register_background_update_handler(
             "users_set_deactivated_flag", self._background_update_set_deactivated_flag
-        )
-
-        self.db_pool.updates.register_noop_background_update(
-            "user_threepids_grandfather"
         )
 
         self.db_pool.updates.register_background_index_update(

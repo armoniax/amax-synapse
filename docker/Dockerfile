@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Dockerfile to build the matrixdotorg/synapse docker images.
 #
 # Note that it uses features which are only available in BuildKit - see
@@ -39,7 +40,7 @@ FROM docker.io/python:${PYTHON_VERSION}-slim as requirements
 RUN \
    --mount=type=cache,target=/var/cache/apt,sharing=locked \
    --mount=type=cache,target=/var/lib/apt,sharing=locked \
- apt-get update && apt-get install -y git \
+ apt-get update -qq && apt-get install -yqq git \
     && rm -rf /var/lib/apt/lists/*
 
 # We install poetry in its own build stage to avoid its dependencies conflicting with
@@ -54,7 +55,7 @@ RUN \
 # NB: In poetry 1.2 `poetry export` will be moved into a plugin; we'll need to also
 # pip install poetry-plugin-export (https://github.com/python-poetry/poetry-plugin-export).
 RUN --mount=type=cache,target=/root/.cache/pip \
-  pip install --user git+https://github.com/python-poetry/poetry.git@fb13b3a676f476177f7937ffa480ee5cff9a90a5
+  pip install --user "poetry-core==1.1.0a7" "git+https://github.com/python-poetry/poetry.git@fb13b3a676f476177f7937ffa480ee5cff9a90a5"
 
 WORKDIR /synapse
 
@@ -72,7 +73,7 @@ FROM docker.io/python:${PYTHON_VERSION}-slim as builder
 RUN \
    --mount=type=cache,target=/var/cache/apt,sharing=locked \
    --mount=type=cache,target=/var/lib/apt,sharing=locked \
- apt-get update && apt-get install -y \
+ apt-get update -qq && apt-get install -yqq \
     build-essential \
     libffi-dev \
     libjpeg-dev \
@@ -117,7 +118,7 @@ LABEL org.opencontainers.image.licenses='Apache-2.0'
 RUN \
    --mount=type=cache,target=/var/cache/apt,sharing=locked \
    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-  apt-get update && apt-get install -y \
+  apt-get update -qq && apt-get install -yqq \
     curl \
     gosu \
     libjpeg62-turbo \

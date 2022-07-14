@@ -206,7 +206,32 @@ This means that we need to run our unit tests against PostgreSQL too. Our CI doe
 this automatically for pull requests and release candidates, but it's sometimes
 useful to reproduce this locally.
 
-To do so, [configure Postgres](../postgres.md) and run `trial` with the
+#### Using Docker
+
+The easiest way to do so is to run Postgres via a docker container. In one
+terminal:
+
+```shell
+docker run --rm -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=postgres -e POSTGRES_DB=postgress -p 5432:5432 postgres:14
+```
+
+If you see an error like
+
+```
+docker: Error response from daemon: driver failed programming external connectivity on endpoint nice_ride (b57bbe2e251b70015518d00c9981e8cb8346b5c785250341a6c53e3c899875f1): Error starting userland proxy: listen tcp4 0.0.0.0:5432: bind: address already in use.
+```
+
+then something is already bound to port 5432. You're probably already running postgres locally.
+
+Once you have a postgres server running, invoke `trial` in a second terminal:
+
+```shell
+SYNAPSE_POSTGRES=1 SYNAPSE_POSTGRES_HOST=127.0.0.1 SYNAPSE_POSTGRES_USER=postgres SYNAPSE_POSTGRES_PASSWORD=mysecretpassword poetry run trial tests
+````
+
+#### Using an existing Postgres installation
+
+If you have postgres already installed on your system, you can run `trial` with the
 following environment variables matching your configuration:
 
 - `SYNAPSE_POSTGRES` to anything nonempty
@@ -229,8 +254,8 @@ You don't need to specify the host, user, port or password if your Postgres
 server is set to authenticate you over the UNIX socket (i.e. if the `psql` command
 works without further arguments).
 
-Your Postgres account needs to be able to create databases.
-
+Your Postgres account needs to be able to create databases; see the postgres
+docs for [`ALTER ROLE`](https://www.postgresql.org/docs/current/sql-alterrole.html).
 
 ## Run the integration tests ([Sytest](https://github.com/matrix-org/sytest)).
 
@@ -270,14 +295,33 @@ COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh
 To run a specific test file, you can pass the test name at the end of the command. The name passed comes from the naming structure in your Complement tests. If you're unsure of the name, you can do a full run and copy it from the test output:
 
 ```sh
-COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh TestBackfillingHistory
+COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -run TestImportHistoricalMessages
 ```
 
 To run a specific test, you can specify the whole name structure:
 
 ```sh
-COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh TestBackfillingHistory/parallel/Backfilled_historical_events_resolve_with_proper_state_in_correct_order
+COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -run TestImportHistoricalMessages/parallel/Historical_events_resolve_in_the_correct_order
 ```
+
+The above will run a monolithic (single-process) Synapse with SQLite as the database. For other configurations, try:
+
+- Passing `POSTGRES=1` as an environment variable to use the Postgres database instead.
+- Passing `WORKERS=1` as an environment variable to use a workerised setup instead. This option implies the use of Postgres.
+
+
+### Prettier formatting with `gotestfmt`
+
+If you want to format the output of the tests the same way as it looks in CI,
+install [gotestfmt](https://github.com/haveyoudebuggedit/gotestfmt).
+
+You can then use this incantation to format the tests appropriately:
+
+```sh
+COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -json | gotestfmt -hide successful-tests
+```
+
+(Remove `-hide successful-tests` if you don't want to hide successful tests.)
 
 
 ### Access database for homeserver after Complement test runs.
@@ -397,8 +441,8 @@ same lightweight approach that the Linux Kernel
 [submitting patches process](
 https://www.kernel.org/doc/html/latest/process/submitting-patches.html#sign-your-work-the-developer-s-certificate-of-origin>),
 [Docker](https://github.com/docker/docker/blob/master/CONTRIBUTING.md), and many other
-projects use: the DCO (Developer Certificate of Origin:
-http://developercertificate.org/). This is a simple declaration that you wrote
+projects use: the DCO ([Developer Certificate of Origin](http://developercertificate.org/)).
+This is a simple declaration that you wrote
 the contribution or otherwise have the right to contribute it to Matrix:
 
 ```

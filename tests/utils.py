@@ -169,7 +169,7 @@ def default_config(name, parse=False):
         # disable user directory updates, because they get done in the
         # background, which upsets the test runner.
         "update_user_directory": False,
-        "caches": {"global_factor": 1},
+        "caches": {"global_factor": 1, "sync_response_cache_duration": 0},
         "listeners": [{"port": 0, "type": "http"}],
     }
 
@@ -264,7 +264,7 @@ class MockClock:
 async def create_room(hs, room_id: str, creator_id: str):
     """Creates and persist a creation event for the given room"""
 
-    persistence_store = hs.get_storage().persistence
+    persistence_store = hs.get_storage_controllers().persistence
     store = hs.get_datastores().main
     event_builder_factory = hs.get_event_builder_factory()
     event_creation_handler = hs.get_event_creation_handler()
