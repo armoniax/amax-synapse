@@ -54,7 +54,7 @@ skip_gitignore = true
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.62.0"
+version = "1.67.0"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -110,7 +110,9 @@ jsonschema = ">=3.0.0"
 frozendict = ">=1,!=2.1.2"
 # We require 2.1.0 or higher for type hints. Previous guard was >= 1.1.0
 unpaddedbase64 = ">=2.1.0"
-canonicaljson = "^1.4.0"
+# We require 1.5.0 to work around an issue when running against the C implementation of
+# frozendict: https://github.com/matrix-org/python-canonicaljson/issues/36
+canonicaljson = "^1.5.0"
 # we use the type definitions added in signedjson 1.1.
 signedjson = "^1.1.0"
 # validating SSL certs for IP addresses requires service_identity 18.1.
@@ -156,6 +158,9 @@ packaging = ">=16.1"
 # At the time of writing, we only use functions from the version `importlib.metadata`
 # which shipped in Python 3.8. This corresponds to version 1.4 of the backport.
 importlib_metadata = { version = ">=1.4", python = "<3.8" }
+# This is the most recent version of Pydantic with available on common distros.
+pydantic = ">=1.7.4"
+
 
 
 # Optional Dependencies

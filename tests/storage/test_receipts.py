@@ -12,24 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 from synapse.api.constants import ReceiptTypes
-from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.types import UserID, create_requester
 
 from tests.test_utils.event_injection import create_event
-
-from ._base import BaseSlavedStoreTestCase
+from tests.unittest import HomeserverTestCase
 
 OTHER_USER_ID = "@other:test"
 OUR_USER_ID = "@our:test"
 
 
-class SlavedReceiptTestCase(BaseSlavedStoreTestCase):
-
-    STORE_TYPE = SlavedReceiptsStore
-
-    def prepare(self, reactor, clock, homeserver):
+class ReceiptTestCase(HomeserverTestCase):
+    def prepare(self, reactor, clock, homeserver) -> None:
         super().prepare(reactor, clock, homeserver)
+
+        self.store = homeserver.get_datastores().main
+
         self.room_creator = homeserver.get_room_creation_handler()
         self.persist_event_storage_controller = (
             self.hs.get_storage_controllers().persistence
@@ -85,32 +84,42 @@ class SlavedReceiptTestCase(BaseSlavedStoreTestCase):
             )
         )
 
-    def test_return_empty_with_no_data(self):
+    def test_return_empty_with_no_data(self) -> None:
         res = self.get_success(
-            self.master_store.get_receipts_for_user(
-                OUR_USER_ID, [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE]
-            )
-        )
-        self.assertEqual(res, {})
-
-        res = self.get_success(
-            self.master_store.get_receipts_for_user_with_orderings(
+            self.store.get_receipts_for_user(
                 OUR_USER_ID,
-                [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE],
+                [
+                    ReceiptTypes.READ,
+                    ReceiptTypes.READ_PRIVATE,
+                ],
             )
         )
         self.assertEqual(res, {})
 
         res = self.get_success(
-            self.master_store.get_last_receipt_event_id_for_user(
+            self.store.get_receipts_for_user_with_orderings(
+                OUR_USER_ID,
+                [
+                    ReceiptTypes.READ,
+                    ReceiptTypes.READ_PRIVATE,
+                ],
+            )
+        )
+        self.assertEqual(res, {})
+
+        res = self.get_success(
+            self.store.get_last_receipt_event_id_for_user(
                 OUR_USER_ID,
                 self.room_id1,
-                [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE],
+                [
+                    ReceiptTypes.READ,
+                    ReceiptTypes.READ_PRIVATE,
+                ],
             )
         )
         self.assertEqual(res, None)
 
-    def test_get_receipts_for_user(self):
+    def test_get_receipts_for_user(self) -> None:
         # Send some events into the first room
         event1_1_id = self.create_and_send_event(
             self.room_id1, UserID.from_string(OTHER_USER_ID)
@@ -121,20 +130,20 @@ class SlavedReceiptTestCase(BaseSlavedStoreTestCase):
 
         # Send public read receipt for the first event
         self.get_success(
-            self.master_store.insert_receipt(
+            self.store.insert_receipt(
                 self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event1_1_id], {}
             )
         )
         # Send private read receipt for the second event
         self.get_success(
-            self.master_store.insert_receipt(
+            self.store.insert_receipt(
                 self.room_id1, ReceiptTypes.READ_PRIVATE, OUR_USER_ID, [event1_2_id], {}
             )
         )
 
         # Test we get the latest event when we want both private and public receipts
         res = self.get_success(
-            self.master_store.get_receipts_for_user(
+            self.store.get_receipts_for_user(
                 OUR_USER_ID, [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE]
             )
         )
@@ -142,26 +151,24 @@ class SlavedReceiptTestCase(BaseSlavedStoreTestCase):
 
         # Test we get the older event when we want only public receipt
         res = self.get_success(
-            self.master_store.get_receipts_for_user(OUR_USER_ID, [ReceiptTypes.READ])
+            self.store.get_receipts_for_user(OUR_USER_ID, [ReceiptTypes.READ])
         )
         self.assertEqual(res, {self.room_id1: event1_1_id})
 
         # Test we get the latest event when we want only the public receipt
         res = self.get_success(
-            self.master_store.get_receipts_for_user(
-                OUR_USER_ID, [ReceiptTypes.READ_PRIVATE]
-            )
+            self.store.get_receipts_for_user(OUR_USER_ID, [ReceiptTypes.READ_PRIVATE])
         )
         self.assertEqual(res, {self.room_id1: event1_2_id})
 
         # Test receipt updating
         self.get_success(
-            self.master_store.insert_receipt(
+            self.store.insert_receipt(
                 self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event1_2_id], {}
             )
         )
         res = self.get_success(
-            self.master_store.get_receipts_for_user(OUR_USER_ID, [ReceiptTypes.READ])
+            self.store.get_receipts_for_user(OUR_USER_ID, [ReceiptTypes.READ])
         )
         self.assertEqual(res, {self.room_id1: event1_2_id})
 
@@ -172,18 +179,18 @@ class SlavedReceiptTestCase(BaseSlavedStoreTestCase):
 
         # Test new room is reflected in what the method returns
         self.get_success(
-            self.master_store.insert_receipt(
+            self.store.insert_receipt(
                 self.room_id2, ReceiptTypes.READ_PRIVATE, OUR_USER_ID, [event2_1_id], {}
             )
         )
         res = self.get_success(
-            self.master_store.get_receipts_for_user(
+            self.store.get_receipts_for_user(
                 OUR_USER_ID, [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE]
             )
         )
         self.assertEqual(res, {self.room_id1: event1_2_id, self.room_id2: event2_1_id})
 
-    def test_get_last_receipt_event_id_for_user(self):
+    def test_get_last_receipt_event_id_for_user(self) -> None:
         # Send some events into the first room
         event1_1_id = self.create_and_send_event(
             self.room_id1, UserID.from_string(OTHER_USER_ID)
@@ -194,20 +201,20 @@ class SlavedReceiptTestCase(BaseSlavedStoreTestCase):
 
         # Send public read receipt for the first event
         self.get_success(
-            self.master_store.insert_receipt(
+            self.store.insert_receipt(
                 self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event1_1_id], {}
             )
         )
         # Send private read receipt for the second event
         self.get_success(
-            self.master_store.insert_receipt(
+            self.store.insert_receipt(
                 self.room_id1, ReceiptTypes.READ_PRIVATE, OUR_USER_ID, [event1_2_id], {}
             )
         )
 
         # Test we get the latest event when we want both private and public receipts
         res = self.get_success(
-            self.master_store.get_last_receipt_event_id_for_user(
+            self.store.get_last_receipt_event_id_for_user(
                 OUR_USER_ID,
                 self.room_id1,
                 [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE],
@@ -217,7 +224,7 @@ class SlavedReceiptTestCase(BaseSlavedStoreTestCase):
 
         # Test we get the older event when we want only public receipt
         res = self.get_success(
-            self.master_store.get_last_receipt_event_id_for_user(
+            self.store.get_last_receipt_event_id_for_user(
                 OUR_USER_ID, self.room_id1, [ReceiptTypes.READ]
             )
         )
@@ -225,7 +232,7 @@ class SlavedReceiptTestCase(BaseSlavedStoreTestCase):
 
         # Test we get the latest event when we want only the private receipt
         res = self.get_success(
-            self.master_store.get_last_receipt_event_id_for_user(
+            self.store.get_last_receipt_event_id_for_user(
                 OUR_USER_ID, self.room_id1, [ReceiptTypes.READ_PRIVATE]
             )
         )
@@ -233,12 +240,12 @@ class SlavedReceiptTestCase(BaseSlavedStoreTestCase):
 
         # Test receipt updating
         self.get_success(
-            self.master_store.insert_receipt(
+            self.store.insert_receipt(
                 self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event1_2_id], {}
             )
         )
         res = self.get_success(
-            self.master_store.get_last_receipt_event_id_for_user(
+            self.store.get_last_receipt_event_id_for_user(
                 OUR_USER_ID, self.room_id1, [ReceiptTypes.READ]
             )
         )
@@ -251,12 +258,12 @@ class SlavedReceiptTestCase(BaseSlavedStoreTestCase):
 
         # Test new room is reflected in what the method returns
         self.get_success(
-            self.master_store.insert_receipt(
+            self.store.insert_receipt(
                 self.room_id2, ReceiptTypes.READ_PRIVATE, OUR_USER_ID, [event2_1_id], {}
             )
         )
         res = self.get_success(
-            self.master_store.get_last_receipt_event_id_for_user(
+            self.store.get_last_receipt_event_id_for_user(
                 OUR_USER_ID,
                 self.room_id2,
                 [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE],
