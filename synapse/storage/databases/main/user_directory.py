@@ -467,7 +467,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         return False
 
     async def update_profile_in_user_dir(
-        self, user_id: str, display_name: Optional[str], avatar_url: Optional[str]
+        self, user_id: str, display_name: Optional[str], avatar_url: Optional[str], avatar_nft: Optional[str], metadata: Optional[str]
     ) -> None:
         """
         Update or add a user's profile in the user directory.
@@ -475,12 +475,15 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         # If the display name or avatar URL are unexpected types, replace with None.
         display_name = non_null_str_or_none(display_name)
         avatar_url = non_null_str_or_none(avatar_url)
+        # avatar_nft_url = non_null_str_or_none(avatar_nft)
+        # metadata = non_null_str_or_none(metadata)
 
         def _update_profile_in_user_dir_txn(txn: LoggingTransaction) -> None:
             self.db_pool.simple_upsert_txn(
                 txn,
                 table="user_directory",
                 keyvalues={"user_id": user_id},
+                # values={"display_name": display_name, "avatar_url": avatar_url, "avatar_nft": avatar_nft_url, "metadata": metadata},
                 values={"display_name": display_name, "avatar_url": avatar_url},
                 lock=False,  # We're only inserter
             )

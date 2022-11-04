@@ -135,7 +135,7 @@ class UserDirectoryHandler(StateDeltasHandler):
 
         if await self.store.should_include_local_user_in_dir(user_id):
             await self.store.update_profile_in_user_dir(
-                user_id, profile.display_name, profile.avatar_url
+                user_id, profile.display_name, profile.avatar_url, profile.avatar_nft, profile.metadata
             )
 
     async def handle_local_user_deactivated(self, user_id: str) -> None:

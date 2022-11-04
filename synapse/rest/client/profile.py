@@ -140,6 +140,71 @@ class ProfileAvatarURLRestServlet(RestServlet):
         return 200, {}
 
 
+class ProfileInfoRestServlet(RestServlet):
+    PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)/info", v1=True)
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
+        self.hs = hs
+        self.profile_handler = hs.get_profile_handler()
+        self.auth = hs.get_auth()
+
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester_user = None
+
+        if self.hs.config.server.require_auth_for_profile_requests:
+            requester = await self.auth.get_user_by_req(request)
+            requester_user = requester.user
+
+        if not UserID.is_valid(user_id):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, "Invalid user id", Codes.INVALID_PARAM
+            )
+
+        user = UserID.from_string(user_id)
+        await self.profile_handler.check_profile_query_allowed(user, requester_user)
+
+        profileInfo = await self.profile_handler.get_profile(user)
+
+        avatarNft = profileInfo["avatar_nft"]
+        metadata = profileInfo["metadata"]
+
+        ret = {}
+        if avatarNft is not None:
+            ret["avatar_nft"] = avatarNft
+
+        if metadata is not None:
+            ret["metadata"] = metadata
+
+        return 200, ret
+
+    async def on_PUT(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        user = UserID.from_string(user_id)
+        is_admin = await self.auth.is_server_admin(requester)
+
+        content = parse_json_object_from_request(request)
+
+        try:
+            new_avatar_nft = content["avatar_nft"]
+            new_metadata = content["metadata"]
+        except Exception:
+            raise SynapseError(
+                code=400,
+                msg="Unable to parse name",
+                errcode=Codes.BAD_JSON,
+            )
+
+        await self.profile_handler.set_profile_info(user, requester, new_avatar_nft,
+                                                    new_metadata, is_admin)
+
+        return 200, {}
+
+
 class ProfileRestServlet(RestServlet):
     PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)", v1=True)
 
