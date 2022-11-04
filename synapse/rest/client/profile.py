@@ -231,14 +231,25 @@ class ProfileRestServlet(RestServlet):
         user = UserID.from_string(user_id)
         await self.profile_handler.check_profile_query_allowed(user, requester_user)
 
-        displayname = await self.profile_handler.get_displayname(user)
-        avatar_url = await self.profile_handler.get_avatar_url(user)
+        # displayname = await self.profile_handler.get_displayname(user)
+        # avatar_url = await self.profile_handler.get_avatar_url(user)
+
+        profileInfo = await self.profile_handler.get_profile(user)
+
+        avatarNft = profileInfo["avatar_nft"]
+        metadata = profileInfo["metadata"]
 
         ret = {}
         if displayname is not None:
             ret["displayname"] = displayname
         if avatar_url is not None:
             ret["avatar_url"] = avatar_url
+
+        if avatarNft is not None:
+            ret["avatar_nft"] = avatarNft
+
+        if metadata is not None:
+            ret["metadata"] = metadata
 
         return 200, ret
 
