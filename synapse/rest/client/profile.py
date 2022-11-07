@@ -168,8 +168,8 @@ class ProfileInfoRestServlet(RestServlet):
 
         profileInfo = await self.profile_handler.get_profile(user)
 
-        avatarNft = profileInfo["avatar_nft"]
-        metadata = profileInfo["metadata"]
+        avatarNft = profileInfo.get("avatar_nft")
+        metadata = profileInfo.get("metadata")
 
         ret = {}
         if avatarNft is not None:
@@ -236,8 +236,10 @@ class ProfileRestServlet(RestServlet):
 
         profileInfo = await self.profile_handler.get_profile(user)
 
-        avatarNft = profileInfo["avatar_nft"]
-        metadata = profileInfo["metadata"]
+        displayname = profileInfo.get("displayname")
+        avatar_url = profileInfo.get("avatar_url")
+        avatarNft = profileInfo.get("avatar_nft")
+        metadata = profileInfo.get("metadata")
 
         ret = {}
         if displayname is not None:
