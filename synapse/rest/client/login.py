@@ -15,6 +15,7 @@ import logging
 import random
 import re
 import string
+import time
 from re import match
 
 from typing import (
@@ -47,6 +48,7 @@ from synapse.api.errors import (
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.urls import CLIENT_API_PREFIX
 from synapse.appservice import ApplicationService
+from synapse.handlers.auth import convert_client_dict_legacy_fields_to_identifier
 from synapse.handlers.sso import SsoIdentityProvider
 from synapse.http import get_request_uri
 from synapse.http.server import HttpServer, finish_request
