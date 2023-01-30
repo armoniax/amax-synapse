@@ -869,7 +869,37 @@ class CasTicketServlet(RestServlet):
             request, ticket, client_redirect_url, session
         )
 
+class RandomStrServlet(RestServlet):
+    PATTERNS = client_patterns("/sign/get_random")
 
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
+        self.hs = hs
+
+        # redis
+        self._external_cache = hs.get_external_cache()
+        self._cache_name = 'cache_sign_msg'
+        self.wallet_sign_message = hs.config.server.wallet_sigin_message
+
+    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        rand_str = ''.join(random.sample(string.ascii_letters + string.digits, 32))
+
+        # message = "Welcome to amax-synapse! sign nonce:{s}".format(s=rand_str)
+        message = "{sign_ms} sign nonce:{s}".format(sign_ms=self.wallet_sign_message, s=rand_str)
+
+        # message to redis, expiry_ms: 60000
+        key = rand_str
+        # test
+        expiry_ms = 3000000
+        await self._external_cache.set(self._cache_name, key, message, expiry_ms)
+
+        response: Dict[str, Union[str, int]] = {
+            "message": message,
+            # "timestamp": key
+        }
+
+        return 200, response
+        
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     LoginRestServlet(hs).register(http_server)
     if hs.config.registration.refreshable_access_token_lifetime is not None:
@@ -877,6 +907,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     SsoRedirectServlet(hs).register(http_server)
     if hs.config.cas.cas_enabled:
         CasTicketServlet(hs).register(http_server)
+    RandomStrServlet(hs).register(http_server)
 
 
 def _load_sso_handlers(hs: "HomeServer") -> None:
