@@ -976,7 +976,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             return 200, {}
 
         targets = None
-        if content["user_ids"] is None and membership_action == "kick":
+        if content["user_ids"] is not None and membership_action == "kick":
             if isinstance(content["user_ids"], [str]):
                 raise SynapseError(400, "user_ids type is invalid", Codes.BAD_JSON)
             targets = [UserID.from_string(userId) for userId in
@@ -996,13 +996,13 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         try:
             [await self.room_member_handler.update_membership(
                 requester=requester,
-                target=targetId,
+                target=target,
                 room_id=room_id,
                 action=membership_action,
                 txn_id=txn_id,
                 third_party_signed=content.get("third_party_signed", None),
                 content=event_content,
-            ) for targetId in targets]
+            ) for target in targets]
         except ShadowBanError:
             # Pretend the request succeeded.
             pass
