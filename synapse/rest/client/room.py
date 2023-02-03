@@ -977,7 +977,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
 
         targets = None
         if content["user_ids"] is not None and membership_action == "kick":
-            if isinstance(content["user_ids"], [str]):
+            if not isinstance(content["user_ids"], [str]):
                 raise SynapseError(400, "user_ids type is invalid", Codes.BAD_JSON)
             targets = [UserID.from_string(userId) for userId in
                        list(content["user_ids"])]
