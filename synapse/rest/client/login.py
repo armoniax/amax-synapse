@@ -337,8 +337,8 @@ class LoginRestServlet(RestServlet):
         # Get the public key from message and sig
         sig_bytes = hexbytes.HexBytes(signature)
 
-        if len(sig_bytes) < 65:
-            print("signature is invalid for parse less 65")
+        if len(sig_bytes) != 65:
+            print("signature is invalid for parse not equal 65")
             return
 
         if sig_bytes[64] != 27 and sig_bytes[64] != 28:
