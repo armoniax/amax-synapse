@@ -15,7 +15,10 @@ import logging
 import random
 import re
 import string
-import time
+import hexbytes
+import eth_keys
+from Cryptodome.Hash import keccak
+
 from re import match
 
 from typing import (
@@ -324,6 +327,29 @@ class LoginRestServlet(RestServlet):
             ratelimit=appservice.is_rate_limited(),
             should_issue_refresh_token=should_issue_refresh_token,
         )
+
+    async def _check_eth_signature(self, message: str, signature: str, wallet_address: str):
+        prefixed_nonce = "\x19Ethereum Signed Message:\n{}{}".format(
+            len(message.encode()), message)
+        msg_hash = keccak.new(digest_bits=256).update(
+            prefixed_nonce.encode()).hexdigest()
+
+        # Get the public key from message and sig
+        sig_bytes = hexbytes.HexBytes(signature)
+
+        if len(sig_bytes) < 65:
+            print("signature is invalid for parse less 65")
+            return
+
+        if sig_bytes[64] != 27 and sig_bytes[64] != 28:
+            print("Signature is invalid")
+            return
+
+        sig_bytes = sig_bytes[:64] + bytes([sig_bytes[64] - 27])
+
+        verify_pk = eth_keys.keys.Signature(sig_bytes).recover_public_key_from_msg_hash(
+            bytes.fromhex(msg_hash))
+        return verify_pk.to_checksum_address().lower() == wallet_address.lower()
 
     async def _do_other_login(
         self, login_submission: JsonDict, should_issue_refresh_token: bool = False
