@@ -418,7 +418,7 @@ class LoginRestServlet(RestServlet):
         data = parse.urlencode(form_data)
         req = requests.post(self.amax_signature_url, data=data, headers=headers)
         req_content = eval(req.content)
-        print("signature_verify request status code:%s, result:%s" % (req.status_code, req_content))
+        print("signature_verify request url: %s, status code:%s, result:%s" % (self.amax_signature_url, req.status_code, req_content))
         if req_content['code'] != 200:
             raise SynapseError(400, "Unknown signature %s" % login_submission.get("signature"), Codes.INVALID_WALLET_SIGNATURE)
         username = login_submission.get("wallet_address")
