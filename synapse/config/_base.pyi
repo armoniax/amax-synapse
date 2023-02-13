@@ -33,6 +33,7 @@ from synapse.config import (  # noqa: F401
     experimental,
     federation,
     jwt,
+    login,
     key,
     logger,
     metrics,
@@ -99,6 +100,7 @@ class RootConfig:
     sso: sso.SSOConfig
     oidc: oidc.OIDCConfig
     jwt: jwt.JWTConfig
+    login: login.LoginConfig
     auth: auth.AuthConfig
     email: emailconfig.EmailConfig
     worker: workers.WorkerConfig
@@ -167,7 +169,7 @@ class RootConfig:
         self, section_name: Literal["caches"]
     ) -> cache.CacheConfig: ...
     @overload
-    def reload_config_section(self, section_name: str) -> "Config": ...
+    def reload_config_section(self, section_name: str) -> Config: ...
 
 class Config:
     root: RootConfig
