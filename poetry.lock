@@ -54,6 +54,17 @@ six = "*"
 visualize = ["Twisted (>=16.1.1)", "graphviz (>0.5.1)"]
 
 [[package]]
+name = "base58"
+version = "2.1.1"
+description = "Base58 and Base58Check implementation."
+category = "main"
+optional = false
+python-versions = ">=3.5"
+
+[package.extras]
+tests = ["PyHamcrest (>=2.0.2)", "mypy", "pytest (>=4.6)", "pytest-benchmark", "pytest-cov", "pytest-flake8"]
+
+[[package]]
 name = "bcrypt"
 version = "4.0.1"
 description = "Modern password hashing for your software and your servers"
@@ -441,6 +452,19 @@ files = [
 [package.extras]
 dev = ["Sphinx", "coverage", "flake8", "lxml", "memory-profiler", "mypy (==0.910)", "tox", "xmlschema (>=1.8.0)"]
 
+[[package]]
+name = "eospy"
+version = "0.0.2"
+description = "Python library of the EOS.IO project."
+category = "main"
+optional = false
+python-versions = "*"
+files = [
+    {file = "eospy-0.0.2.tar.gz", hash = "sha256:38f4d28af929c1f3b47b848b7bd47d2da79564385af6cb07b802c0c614a59bbd"},
+]
+
+[package.dependencies]
+requests = "*"
 [[package]]
 name = "frozendict"
 version = "2.3.4"
