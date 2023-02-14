@@ -168,9 +168,7 @@ class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
                     {"stream_id": 6, "event_id": "$some_event"},
                 ],
                 (self.other_room_id, "m.read", self.user_id): [
-                    # It is possible for stream IDs to be duplicated.
-                    {"stream_id": 7, "event_id": "$some_event"},
-                    {"stream_id": 7, "event_id": "$some_event"},
+                    {"stream_id": 7, "event_id": "$some_event"}
                 ],
             },
             expected_unique_receipts={

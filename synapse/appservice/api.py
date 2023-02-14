@@ -14,17 +14,7 @@
 # limitations under the License.
 import logging
 import urllib.parse
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    Iterable,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
-)
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
 from prometheus_client import Counter
 from typing_extensions import TypeGuard
@@ -269,7 +259,7 @@ class ApplicationServiceApi(SimpleHttpClient):
     async def push_bulk(
         self,
         service: "ApplicationService",
-        events: Sequence[EventBase],
+        events: List[EventBase],
         ephemeral: List[JsonDict],
         to_device_messages: List[JsonDict],
         one_time_keys_count: TransactionOneTimeKeysCount,

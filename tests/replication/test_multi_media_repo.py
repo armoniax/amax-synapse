@@ -18,14 +18,12 @@ from typing import Optional, Tuple
 from twisted.internet.interfaces import IOpenSSLServerConnectionCreator
 from twisted.internet.protocol import Factory
 from twisted.protocols.tls import TLSMemoryBIOFactory, TLSMemoryBIOProtocol
-from twisted.test.proto_helpers import MemoryReactor
 from twisted.web.http import HTTPChannel
 from twisted.web.server import Request
 
 from synapse.rest import admin
 from synapse.rest.client import login
 from synapse.server import HomeServer
-from synapse.util import Clock
 
 from tests.http import TestServerTLSConnectionFactory, get_test_ca_cert_file
 from tests.replication._base import BaseMultiWorkerStreamTestCase
@@ -45,13 +43,13 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+    def prepare(self, reactor, clock, hs):
         self.user_id = self.register_user("user", "pass")
         self.access_token = self.login("user", "pass")
 
         self.reactor.lookups["example.com"] = "1.2.3.4"
 
-    def default_config(self) -> dict:
+    def default_config(self):
         conf = super().default_config()
         conf["federation_custom_ca_list"] = [get_test_ca_cert_file()]
         return conf
@@ -124,7 +122,7 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
 
         return channel, request
 
-    def test_basic(self) -> None:
+    def test_basic(self):
         """Test basic fetching of remote media from a single worker."""
         hs1 = self.make_worker_hs("synapse.app.generic_worker")
 
@@ -140,7 +138,7 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.result["body"], b"Hello!")
 
-    def test_download_simple_file_race(self) -> None:
+    def test_download_simple_file_race(self):
         """Test that fetching remote media from two different processes at the
         same time works.
         """
@@ -179,7 +177,7 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
         # We expect only one new file to have been persisted.
         self.assertEqual(start_count + 1, self._count_remote_media())
 
-    def test_download_image_race(self) -> None:
+    def test_download_image_race(self):
         """Test that fetching remote *images* from two different processes at
         the same time works.
 
@@ -231,7 +229,7 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
         return sum(len(files) for _, _, files in os.walk(path))
 
 
-def get_connection_factory() -> TestServerTLSConnectionFactory:
+def get_connection_factory():
     # this needs to happen once, but not until we are ready to run the first test
     global test_server_connection_factory
     if test_server_connection_factory is None:
@@ -265,6 +263,6 @@ def _build_test_server(
     return server_tls_factory.buildProtocol(None)
 
 
-def _log_request(request: Request) -> None:
+def _log_request(request):
     """Implements Factory.log, which is expected by Request.finish"""
     logger.info("Completed request %s", request)

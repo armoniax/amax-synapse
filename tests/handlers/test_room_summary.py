@@ -11,11 +11,10 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Iterable, List, Optional, Tuple
 from unittest import mock
 
 from twisted.internet.defer import ensureDeferred
-from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import (
     EventContentFields,
@@ -35,14 +34,11 @@ from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.server import HomeServer
 from synapse.types import JsonDict, UserID, create_requester
-from synapse.util import Clock
 
 from tests import unittest
 
 
-def _create_event(
-    room_id: str, order: Optional[Any] = None, origin_server_ts: int = 0
-) -> mock.Mock:
+def _create_event(room_id: str, order: Optional[Any] = None, origin_server_ts: int = 0):
     result = mock.Mock(name=room_id)
     result.room_id = room_id
     result.content = {}
@@ -52,40 +48,40 @@ def _create_event(
     return result
 
 
-def _order(*events: mock.Mock) -> List[mock.Mock]:
+def _order(*events):
     return sorted(events, key=_child_events_comparison_key)
 
 
 class TestSpaceSummarySort(unittest.TestCase):
-    def test_no_order_last(self) -> None:
+    def test_no_order_last(self):
         """An event with no ordering is placed behind those with an ordering."""
         ev1 = _create_event("!abc:test")
         ev2 = _create_event("!xyz:test", "xyz")
 
         self.assertEqual([ev2, ev1], _order(ev1, ev2))
 
-    def test_order(self) -> None:
+    def test_order(self):
         """The ordering should be used."""
         ev1 = _create_event("!abc:test", "xyz")
         ev2 = _create_event("!xyz:test", "abc")
 
         self.assertEqual([ev2, ev1], _order(ev1, ev2))
 
-    def test_order_origin_server_ts(self) -> None:
+    def test_order_origin_server_ts(self):
         """Origin server  is a tie-breaker for ordering."""
         ev1 = _create_event("!abc:test", origin_server_ts=10)
         ev2 = _create_event("!xyz:test", origin_server_ts=30)
 
         self.assertEqual([ev1, ev2], _order(ev1, ev2))
 
-    def test_order_room_id(self) -> None:
+    def test_order_room_id(self):
         """Room ID is a final tie-breaker for ordering."""
         ev1 = _create_event("!abc:test")
         ev2 = _create_event("!xyz:test")
 
         self.assertEqual([ev1, ev2], _order(ev1, ev2))
 
-    def test_invalid_ordering_type(self) -> None:
+    def test_invalid_ordering_type(self):
         """Invalid orderings are considered the same as missing."""
         ev1 = _create_event("!abc:test", 1)
         ev2 = _create_event("!xyz:test", "xyz")
@@ -101,7 +97,7 @@ class TestSpaceSummarySort(unittest.TestCase):
         ev1 = _create_event("!abc:test", True)
         self.assertEqual([ev2, ev1], _order(ev1, ev2))
 
-    def test_invalid_ordering_value(self) -> None:
+    def test_invalid_ordering_value(self):
         """Invalid orderings are considered the same as missing."""
         ev1 = _create_event("!abc:test", "foo\n")
         ev2 = _create_event("!xyz:test", "xyz")
@@ -119,7 +115,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+    def prepare(self, reactor, clock, hs: HomeServer):
         self.hs = hs
         self.handler = self.hs.get_room_summary_handler()
 
@@ -227,7 +223,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             fed_handler.on_invite_request(fed_hostname, event, RoomVersions.V6)
         )
 
-    def test_simple_space(self) -> None:
+    def test_simple_space(self):
         """Test a simple space with a single room."""
         # The result should have the space and the room in it, along with a link
         # from space -> room.
@@ -238,7 +234,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         )
         self._assert_hierarchy(result, expected)
 
-    def test_large_space(self) -> None:
+    def test_large_space(self):
         """Test a space with a large number of rooms."""
         rooms = [self.room]
         # Make at least 51 rooms that are part of the space.
@@ -264,7 +260,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         result["rooms"] += result2["rooms"]
         self._assert_hierarchy(result, expected)
 
-    def test_visibility(self) -> None:
+    def test_visibility(self):
         """A user not in a space cannot inspect it."""
         user2 = self.register_user("user2", "pass")
         token2 = self.login("user2", "pass")
@@ -384,7 +380,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self._assert_hierarchy(result2, [(self.space, [self.room])])
 
     def _create_room_with_join_rule(
-        self, join_rule: str, room_version: Optional[str] = None, **extra_content: Any
+        self, join_rule: str, room_version: Optional[str] = None, **extra_content
     ) -> str:
         """Create a room with the given join rule and add it to the space."""
         room_id = self.helper.create_room_as(
@@ -407,7 +403,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self._add_child(self.space, room_id, self.token)
         return room_id
 
-    def test_filtering(self) -> None:
+    def test_filtering(self):
         """
         Rooms should be properly filtered to only include rooms the user has access to.
         """
@@ -480,7 +476,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         )
         self._assert_hierarchy(result, expected)
 
-    def test_complex_space(self) -> None:
+    def test_complex_space(self):
         """
         Create a "complex" space to see how it handles things like loops and subspaces.
         """
@@ -520,7 +516,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         )
         self._assert_hierarchy(result, expected)
 
-    def test_pagination(self) -> None:
+    def test_pagination(self):
         """Test simple pagination works."""
         room_ids = []
         for i in range(1, 10):
@@ -557,7 +553,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self._assert_hierarchy(result, expected)
         self.assertNotIn("next_batch", result)
 
-    def test_invalid_pagination_token(self) -> None:
+    def test_invalid_pagination_token(self):
         """An invalid pagination token, or changing other parameters, shoudl be rejected."""
         room_ids = []
         for i in range(1, 10):
@@ -608,7 +604,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             SynapseError,
         )
 
-    def test_max_depth(self) -> None:
+    def test_max_depth(self):
         """Create a deep tree to test the max depth against."""
         spaces = [self.space]
         rooms = [self.room]
@@ -663,7 +659,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         ]
         self._assert_hierarchy(result, expected)
 
-    def test_unknown_room_version(self) -> None:
+    def test_unknown_room_version(self):
         """
         If a room with an unknown room version is encountered it should not cause
         the entire summary to skip.
@@ -689,7 +685,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         )
         self._assert_hierarchy(result, expected)
 
-    def test_fed_complex(self) -> None:
+    def test_fed_complex(self):
         """
         Return data over federation and ensure that it is handled properly.
         """
@@ -726,9 +722,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             "world_readable": True,
         }
 
-        async def summarize_remote_room_hierarchy(
-            _self: Any, room: Any, suggested_only: bool
-        ) -> Tuple[Optional[_RoomEntry], Dict[str, JsonDict], Set[str]]:
+        async def summarize_remote_room_hierarchy(_self, room, suggested_only):
             return requested_room_entry, {subroom: child_room}, set()
 
         # Add a room to the space which is on another server.
@@ -750,7 +744,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             )
         self._assert_hierarchy(result, expected)
 
-    def test_fed_filtering(self) -> None:
+    def test_fed_filtering(self):
         """
         Rooms returned over federation should be properly filtered to only include
         rooms the user has access to.
@@ -859,9 +853,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-        async def summarize_remote_room_hierarchy(
-            _self: Any, room: Any, suggested_only: bool
-        ) -> Tuple[Optional[_RoomEntry], Dict[str, JsonDict], Set[str]]:
+        async def summarize_remote_room_hierarchy(_self, room, suggested_only):
             return subspace_room_entry, dict(children_rooms), set()
 
         # Add a room to the space which is on another server.
@@ -900,7 +892,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             )
         self._assert_hierarchy(result, expected)
 
-    def test_fed_invited(self) -> None:
+    def test_fed_invited(self):
         """
         A room which the user was invited to should be included in the response.
 
@@ -923,9 +915,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        async def summarize_remote_room_hierarchy(
-            _self: Any, room: Any, suggested_only: bool
-        ) -> Tuple[Optional[_RoomEntry], Dict[str, JsonDict], Set[str]]:
+        async def summarize_remote_room_hierarchy(_self, room, suggested_only):
             return fed_room_entry, {}, set()
 
         # Add a room to the space which is on another server.
@@ -946,7 +936,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             )
         self._assert_hierarchy(result, expected)
 
-    def test_fed_caching(self) -> None:
+    def test_fed_caching(self):
         """
         Federation `/hierarchy` responses should be cached.
         """
@@ -1033,7 +1023,7 @@ class RoomSummaryTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+    def prepare(self, reactor, clock, hs: HomeServer):
         self.hs = hs
         self.handler = self.hs.get_room_summary_handler()
 
@@ -1050,12 +1040,12 @@ class RoomSummaryTestCase(unittest.HomeserverTestCase):
             tok=self.token,
         )
 
-    def test_own_room(self) -> None:
+    def test_own_room(self):
         """Test a simple room created by the requester."""
         result = self.get_success(self.handler.get_room_summary(self.user, self.room))
         self.assertEqual(result.get("room_id"), self.room)
 
-    def test_visibility(self) -> None:
+    def test_visibility(self):
         """A user not in a private room cannot get its summary."""
         user2 = self.register_user("user2", "pass")
         token2 = self.login("user2", "pass")
@@ -1103,7 +1093,7 @@ class RoomSummaryTestCase(unittest.HomeserverTestCase):
         result = self.get_success(self.handler.get_room_summary(user2, self.room))
         self.assertEqual(result.get("room_id"), self.room)
 
-    def test_fed(self) -> None:
+    def test_fed(self):
         """
         Return data over federation and ensure that it is handled properly.
         """
@@ -1115,9 +1105,7 @@ class RoomSummaryTestCase(unittest.HomeserverTestCase):
             {"room_id": fed_room, "world_readable": True},
         )
 
-        async def summarize_remote_room_hierarchy(
-            _self: Any, room: Any, suggested_only: bool
-        ) -> Tuple[Optional[_RoomEntry], Dict[str, JsonDict], Set[str]]:
+        async def summarize_remote_room_hierarchy(_self, room, suggested_only):
             return requested_room_entry, {}, set()
 
         with mock.patch(

@@ -30,7 +30,7 @@ from typing import (
 
 import attr
 
-from synapse.api.constants import MAIN_TIMELINE, Direction, RelationTypes
+from synapse.api.constants import MAIN_TIMELINE, RelationTypes
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore
@@ -40,13 +40,9 @@ from synapse.storage.database import (
     LoggingTransaction,
     make_in_list_sql_clause,
 )
-from synapse.storage.databases.main.stream import (
-    generate_next_token,
-    generate_pagination_bounds,
-    generate_pagination_where_clause,
-)
+from synapse.storage.databases.main.stream import generate_pagination_where_clause
 from synapse.storage.engines import PostgresEngine
-from synapse.types import JsonDict, StreamKeyType, StreamToken
+from synapse.types import JsonDict, RoomStreamToken, StreamKeyType, StreamToken
 from synapse.util.caches.descriptors import cached, cachedList
 
 if TYPE_CHECKING:
@@ -168,7 +164,7 @@ class RelationsWorkerStore(SQLBaseStore):
         relation_type: Optional[str] = None,
         event_type: Optional[str] = None,
         limit: int = 5,
-        direction: Direction = Direction.BACKWARDS,
+        direction: str = "b",
         from_token: Optional[StreamToken] = None,
         to_token: Optional[StreamToken] = None,
     ) -> Tuple[List[_RelatedEvent], Optional[StreamToken]]:
@@ -181,8 +177,8 @@ class RelationsWorkerStore(SQLBaseStore):
             relation_type: Only fetch events with this relation type, if given.
             event_type: Only fetch events with this event type, if given.
             limit: Only fetch the most recent `limit` events.
-            direction: Whether to fetch the most recent first (backwards) or the
-                oldest first (forwards).
+            direction: Whether to fetch the most recent first (`"b"`) or the
+                oldest first (`"f"`).
             from_token: Fetch rows from the given token, or from the start if None.
             to_token: Fetch rows up to the given token, or up to the end if None.
 
@@ -211,22 +207,23 @@ class RelationsWorkerStore(SQLBaseStore):
             where_clause.append("type = ?")
             where_args.append(event_type)
 
-        order, from_bound, to_bound = generate_pagination_bounds(
-            direction,
-            from_token.room_key if from_token else None,
-            to_token.room_key if to_token else None,
-        )
-
         pagination_clause = generate_pagination_where_clause(
             direction=direction,
             column_names=("topological_ordering", "stream_ordering"),
-            from_token=from_bound,
-            to_token=to_bound,
+            from_token=from_token.room_key.as_historical_tuple()
+            if from_token
+            else None,
+            to_token=to_token.room_key.as_historical_tuple() if to_token else None,
             engine=self.database_engine,
         )
 
         if pagination_clause:
             where_clause.append(pagination_clause)
+
+        if direction == "b":
+            order = "DESC"
+        else:
+            order = "ASC"
 
         sql = """
             SELECT event_id, relation_type, sender, topological_ordering, stream_ordering
@@ -269,9 +266,16 @@ class RelationsWorkerStore(SQLBaseStore):
                 topo_orderings = topo_orderings[:limit]
                 stream_orderings = stream_orderings[:limit]
 
-                next_key = generate_next_token(
-                    direction, topo_orderings[-1], stream_orderings[-1]
-                )
+                topo = topo_orderings[-1]
+                token = stream_orderings[-1]
+                if direction == "b":
+                    # Tokens are positions between events.
+                    # This token points *after* the last event in the chunk.
+                    # We need it to point to the event before it in the chunk
+                    # when we are going backwards so we subtract one from the
+                    # stream part.
+                    token -= 1
+                next_key = RoomStreamToken(topo, token)
 
                 if from_token:
                     next_token = from_token.copy_and_replace(
@@ -288,7 +292,6 @@ class RelationsWorkerStore(SQLBaseStore):
                         to_device_key=0,
                         device_list_key=0,
                         groups_key=0,
-                        un_partial_stated_rooms_key=0,
                     )
 
             return events[:limit], next_token

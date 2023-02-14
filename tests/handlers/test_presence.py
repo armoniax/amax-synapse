@@ -12,13 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional, cast
+from typing import Optional
 from unittest.mock import Mock, call
 
 from parameterized import parameterized
 from signedjson.key import generate_signing_key
-
-from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import EventTypes, Membership, PresenceState
 from synapse.api.presence import UserPresenceState
@@ -37,9 +35,7 @@ from synapse.handlers.presence import (
 )
 from synapse.rest import admin
 from synapse.rest.client import room
-from synapse.server import HomeServer
-from synapse.types import JsonDict, UserID, get_domain_from_id
-from synapse.util import Clock
+from synapse.types import UserID, get_domain_from_id
 
 from tests import unittest
 from tests.replication._base import BaseMultiWorkerStreamTestCase
@@ -48,12 +44,10 @@ from tests.replication._base import BaseMultiWorkerStreamTestCase
 class PresenceUpdateTestCase(unittest.HomeserverTestCase):
     servlets = [admin.register_servlets]
 
-    def prepare(
-        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
-    ) -> None:
+    def prepare(self, reactor, clock, homeserver):
         self.store = homeserver.get_datastores().main
 
-    def test_offline_to_online(self) -> None:
+    def test_offline_to_online(self):
         wheel_timer = Mock()
         user_id = "@foo:bar"
         now = 5000000
@@ -91,7 +85,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
             any_order=True,
         )
 
-    def test_online_to_online(self) -> None:
+    def test_online_to_online(self):
         wheel_timer = Mock()
         user_id = "@foo:bar"
         now = 5000000
@@ -134,7 +128,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
             any_order=True,
         )
 
-    def test_online_to_online_last_active_noop(self) -> None:
+    def test_online_to_online_last_active_noop(self):
         wheel_timer = Mock()
         user_id = "@foo:bar"
         now = 5000000
@@ -179,7 +173,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
             any_order=True,
         )
 
-    def test_online_to_online_last_active(self) -> None:
+    def test_online_to_online_last_active(self):
         wheel_timer = Mock()
         user_id = "@foo:bar"
         now = 5000000
@@ -216,7 +210,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
             any_order=True,
         )
 
-    def test_remote_ping_timer(self) -> None:
+    def test_remote_ping_timer(self):
         wheel_timer = Mock()
         user_id = "@foo:bar"
         now = 5000000
@@ -250,7 +244,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
             any_order=True,
         )
 
-    def test_online_to_offline(self) -> None:
+    def test_online_to_offline(self):
         wheel_timer = Mock()
         user_id = "@foo:bar"
         now = 5000000
@@ -272,7 +266,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(wheel_timer.insert.call_count, 0)
 
-    def test_online_to_idle(self) -> None:
+    def test_online_to_idle(self):
         wheel_timer = Mock()
         user_id = "@foo:bar"
         now = 5000000
@@ -306,7 +300,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
             any_order=True,
         )
 
-    def test_persisting_presence_updates(self) -> None:
+    def test_persisting_presence_updates(self):
         """Tests that the latest presence state for each user is persisted correctly"""
         # Create some test users and presence states for them
         presence_states = []
@@ -328,7 +322,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
         self.get_success(self.store.update_presence(presence_states))
 
         # Check that each update is present in the database
-        db_presence_states_raw = self.get_success(
+        db_presence_states = self.get_success(
             self.store.get_all_presence_updates(
                 instance_name="master",
                 last_id=0,
@@ -338,7 +332,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
         )
 
         # Extract presence update user ID and state information into lists of tuples
-        db_presence_states = [(ps[0], ps[1]) for _, ps in db_presence_states_raw[0]]
+        db_presence_states = [(ps[0], ps[1]) for _, ps in db_presence_states[0]]
         presence_states_compare = [(ps.user_id, ps.state) for ps in presence_states]
 
         # Compare what we put into the storage with what we got out.
@@ -349,7 +343,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
 class PresenceTimeoutTestCase(unittest.TestCase):
     """Tests different timers and that the timer does not change `status_msg` of user."""
 
-    def test_idle_timer(self) -> None:
+    def test_idle_timer(self):
         user_id = "@foo:bar"
         status_msg = "I'm here!"
         now = 5000000
@@ -369,7 +363,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         self.assertEqual(new_state.state, PresenceState.UNAVAILABLE)
         self.assertEqual(new_state.status_msg, status_msg)
 
-    def test_busy_no_idle(self) -> None:
+    def test_busy_no_idle(self):
         """
         Tests that a user setting their presence to busy but idling doesn't turn their
         presence state into unavailable.
@@ -393,7 +387,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         self.assertEqual(new_state.state, PresenceState.BUSY)
         self.assertEqual(new_state.status_msg, status_msg)
 
-    def test_sync_timeout(self) -> None:
+    def test_sync_timeout(self):
         user_id = "@foo:bar"
         status_msg = "I'm here!"
         now = 5000000
@@ -413,7 +407,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         self.assertEqual(new_state.state, PresenceState.OFFLINE)
         self.assertEqual(new_state.status_msg, status_msg)
 
-    def test_sync_online(self) -> None:
+    def test_sync_online(self):
         user_id = "@foo:bar"
         status_msg = "I'm here!"
         now = 5000000
@@ -435,7 +429,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         self.assertEqual(new_state.state, PresenceState.ONLINE)
         self.assertEqual(new_state.status_msg, status_msg)
 
-    def test_federation_ping(self) -> None:
+    def test_federation_ping(self):
         user_id = "@foo:bar"
         status_msg = "I'm here!"
         now = 5000000
@@ -454,7 +448,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         self.assertIsNotNone(new_state)
         self.assertEqual(state, new_state)
 
-    def test_no_timeout(self) -> None:
+    def test_no_timeout(self):
         user_id = "@foo:bar"
         now = 5000000
 
@@ -470,7 +464,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
 
         self.assertIsNone(new_state)
 
-    def test_federation_timeout(self) -> None:
+    def test_federation_timeout(self):
         user_id = "@foo:bar"
         status_msg = "I'm here!"
         now = 5000000
@@ -493,7 +487,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         self.assertEqual(new_state.state, PresenceState.OFFLINE)
         self.assertEqual(new_state.status_msg, status_msg)
 
-    def test_last_active(self) -> None:
+    def test_last_active(self):
         user_id = "@foo:bar"
         status_msg = "I'm here!"
         now = 5000000
@@ -514,15 +508,15 @@ class PresenceTimeoutTestCase(unittest.TestCase):
 
 
 class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+    def prepare(self, reactor, clock, hs):
         self.presence_handler = hs.get_presence_handler()
         self.clock = hs.get_clock()
 
-    def test_external_process_timeout(self) -> None:
+    def test_external_process_timeout(self):
         """Test that if an external process doesn't update the records for a while
         we time out their syncing users presence.
         """
-        process_id = "1"
+        process_id = 1
         user_id = "@test:server"
 
         # Notify handler that a user is now syncing.
@@ -550,7 +544,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         )
         self.assertEqual(state.state, PresenceState.OFFLINE)
 
-    def test_user_goes_offline_by_timeout_status_msg_remain(self) -> None:
+    def test_user_goes_offline_by_timeout_status_msg_remain(self):
         """Test that if a user doesn't update the records for a while
         users presence goes `OFFLINE` because of timeout and `status_msg` remains.
         """
@@ -582,7 +576,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         self.assertEqual(state.state, PresenceState.OFFLINE)
         self.assertEqual(state.status_msg, status_msg)
 
-    def test_user_goes_offline_manually_with_no_status_msg(self) -> None:
+    def test_user_goes_offline_manually_with_no_status_msg(self):
         """Test that if a user change presence manually to `OFFLINE`
         and no status is set, that `status_msg` is `None`.
         """
@@ -607,7 +601,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         self.assertEqual(state.state, PresenceState.OFFLINE)
         self.assertEqual(state.status_msg, None)
 
-    def test_user_goes_offline_manually_with_status_msg(self) -> None:
+    def test_user_goes_offline_manually_with_status_msg(self):
         """Test that if a user change presence manually to `OFFLINE`
         and a status is set, that `status_msg` appears.
         """
@@ -624,7 +618,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
             user_id, PresenceState.OFFLINE, "And now here."
         )
 
-    def test_user_reset_online_with_no_status(self) -> None:
+    def test_user_reset_online_with_no_status(self):
         """Test that if a user set again the presence manually
         and no status is set, that `status_msg` is `None`.
         """
@@ -650,7 +644,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         self.assertEqual(state.state, PresenceState.ONLINE)
         self.assertEqual(state.status_msg, None)
 
-    def test_set_presence_with_status_msg_none(self) -> None:
+    def test_set_presence_with_status_msg_none(self):
         """Test that if a user set again the presence manually
         and status is `None`, that `status_msg` is `None`.
         """
@@ -665,7 +659,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         # Mark user as online and `status_msg = None`
         self._set_presencestate_with_status_msg(user_id, PresenceState.ONLINE, None)
 
-    def test_set_presence_from_syncing_not_set(self) -> None:
+    def test_set_presence_from_syncing_not_set(self):
         """Test that presence is not set by syncing if affect_presence is false"""
         user_id = "@test:server"
         status_msg = "I'm here!"
@@ -686,7 +680,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         # and status message should still be the same
         self.assertEqual(state.status_msg, status_msg)
 
-    def test_set_presence_from_syncing_is_set(self) -> None:
+    def test_set_presence_from_syncing_is_set(self):
         """Test that presence is set by syncing if affect_presence is true"""
         user_id = "@test:server"
         status_msg = "I'm here!"
@@ -705,7 +699,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         # we should now be online
         self.assertEqual(state.state, PresenceState.ONLINE)
 
-    def test_set_presence_from_syncing_keeps_status(self) -> None:
+    def test_set_presence_from_syncing_keeps_status(self):
         """Test that presence set by syncing retains status message"""
         user_id = "@test:server"
         status_msg = "I'm here!"
@@ -732,9 +726,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
             },
         }
     )
-    def test_set_presence_from_syncing_keeps_busy(
-        self, test_with_workers: bool
-    ) -> None:
+    def test_set_presence_from_syncing_keeps_busy(self, test_with_workers: bool):
         """Test that presence set by syncing doesn't affect busy status
 
         Args:
@@ -775,7 +767,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
 
     def _set_presencestate_with_status_msg(
         self, user_id: str, state: str, status_msg: Optional[str]
-    ) -> None:
+    ):
         """Set a PresenceState and status_msg and check the result.
 
         Args:
@@ -798,14 +790,14 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
 
 
 class PresenceFederationQueueTestCase(unittest.HomeserverTestCase):
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+    def prepare(self, reactor, clock, hs):
         self.presence_handler = hs.get_presence_handler()
         self.clock = hs.get_clock()
         self.instance_name = hs.get_instance_name()
 
         self.queue = self.presence_handler.get_federation_queue()
 
-    def test_send_and_get(self) -> None:
+    def test_send_and_get(self):
         state1 = UserPresenceState.default("@user1:test")
         state2 = UserPresenceState.default("@user2:test")
         state3 = UserPresenceState.default("@user3:test")
@@ -842,7 +834,7 @@ class PresenceFederationQueueTestCase(unittest.HomeserverTestCase):
         self.assertFalse(limited)
         self.assertCountEqual(rows, [])
 
-    def test_send_and_get_split(self) -> None:
+    def test_send_and_get_split(self):
         state1 = UserPresenceState.default("@user1:test")
         state2 = UserPresenceState.default("@user2:test")
         state3 = UserPresenceState.default("@user3:test")
@@ -885,7 +877,7 @@ class PresenceFederationQueueTestCase(unittest.HomeserverTestCase):
 
         self.assertCountEqual(rows, expected_rows)
 
-    def test_clear_queue_all(self) -> None:
+    def test_clear_queue_all(self):
         state1 = UserPresenceState.default("@user1:test")
         state2 = UserPresenceState.default("@user2:test")
         state3 = UserPresenceState.default("@user3:test")
@@ -929,7 +921,7 @@ class PresenceFederationQueueTestCase(unittest.HomeserverTestCase):
 
         self.assertCountEqual(rows, expected_rows)
 
-    def test_partially_clear_queue(self) -> None:
+    def test_partially_clear_queue(self):
         state1 = UserPresenceState.default("@user1:test")
         state2 = UserPresenceState.default("@user2:test")
         state3 = UserPresenceState.default("@user3:test")
@@ -990,7 +982,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
 
     servlets = [room.register_servlets]
 
-    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
+    def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver(
             "server",
             federation_http_client=None,
@@ -998,14 +990,14 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         )
         return hs
 
-    def default_config(self) -> JsonDict:
+    def default_config(self):
         config = super().default_config()
         # Enable federation sending on the main process.
         config["federation_sender_instances"] = None
         return config
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.federation_sender = cast(Mock, hs.get_federation_sender())
+    def prepare(self, reactor, clock, hs):
+        self.federation_sender = hs.get_federation_sender()
         self.event_builder_factory = hs.get_event_builder_factory()
         self.federation_event_handler = hs.get_federation_event_handler()
         self.presence_handler = hs.get_presence_handler()
@@ -1021,7 +1013,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         # random key to use.
         self.random_signing_key = generate_signing_key("ver")
 
-    def test_remote_joins(self) -> None:
+    def test_remote_joins(self):
         # We advance time to something that isn't 0, as we use 0 as a special
         # value.
         self.reactor.advance(1000000000000)
@@ -1069,7 +1061,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
             destinations={"server3"}, states=[expected_state]
         )
 
-    def test_remote_gets_presence_when_local_user_joins(self) -> None:
+    def test_remote_gets_presence_when_local_user_joins(self):
         # We advance time to something that isn't 0, as we use 0 as a special
         # value.
         self.reactor.advance(1000000000000)
@@ -1118,7 +1110,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
             destinations={"server2", "server3"}, states=[expected_state]
         )
 
-    def _add_new_user(self, room_id: str, user_id: str) -> None:
+    def _add_new_user(self, room_id, user_id):
         """Add new user to the room by creating an event and poking the federation API."""
 
         hostname = get_domain_from_id(user_id)

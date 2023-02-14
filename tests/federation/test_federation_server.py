@@ -21,7 +21,7 @@ from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.config.server import DEFAULT_ROOM_VERSION
-from synapse.events import EventBase, make_event_from_dict
+from synapse.events import make_event_from_dict
 from synapse.federation.federation_server import server_matches_acl_event
 from synapse.rest import admin
 from synapse.rest.client import login, room
@@ -42,7 +42,7 @@ class FederationServerTests(unittest.FederatingHomeserverTestCase):
     ]
 
     @parameterized.expand([(b"",), (b"foo",), (b'{"limit": Infinity}',)])
-    def test_bad_request(self, query_content: bytes) -> None:
+    def test_bad_request(self, query_content):
         """
         Querying with bad data returns a reasonable error code.
         """
@@ -64,7 +64,7 @@ class FederationServerTests(unittest.FederatingHomeserverTestCase):
 
 
 class ServerACLsTestCase(unittest.TestCase):
-    def test_blacklisted_server(self) -> None:
+    def test_blacklisted_server(self):
         e = _create_acl_event({"allow": ["*"], "deny": ["evil.com"]})
         logging.info("ACL event: %s", e.content)
 
@@ -74,7 +74,7 @@ class ServerACLsTestCase(unittest.TestCase):
         self.assertTrue(server_matches_acl_event("evil.com.au", e))
         self.assertTrue(server_matches_acl_event("honestly.not.evil.com", e))
 
-    def test_block_ip_literals(self) -> None:
+    def test_block_ip_literals(self):
         e = _create_acl_event({"allow_ip_literals": False, "allow": ["*"]})
         logging.info("ACL event: %s", e.content)
 
@@ -83,7 +83,7 @@ class ServerACLsTestCase(unittest.TestCase):
         self.assertFalse(server_matches_acl_event("[1:2::]", e))
         self.assertTrue(server_matches_acl_event("1:2:3:4", e))
 
-    def test_wildcard_matching(self) -> None:
+    def test_wildcard_matching(self):
         e = _create_acl_event({"allow": ["good*.com"]})
         self.assertTrue(
             server_matches_acl_event("good.com", e),
@@ -110,7 +110,7 @@ class StateQueryTests(unittest.FederatingHomeserverTestCase):
         login.register_servlets,
     ]
 
-    def test_needs_to_be_in_room(self) -> None:
+    def test_needs_to_be_in_room(self):
         """/v1/state/<room_id> requires the server to be in the room"""
         u1 = self.register_user("u1", "pass")
         u1_token = self.login("u1", "pass")
@@ -131,7 +131,7 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
         super().prepare(reactor, clock, hs)
 
         self._storage_controllers = hs.get_storage_controllers()
@@ -157,7 +157,7 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
         self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
         return channel.json_body
 
-    def test_send_join(self) -> None:
+    def test_send_join(self):
         """happy-path test of send_join"""
         joining_user = "@misspiggy:" + self.OTHER_SERVER_NAME
         join_result = self._make_join(joining_user)
@@ -211,8 +211,9 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
         )
         self.assertEqual(r[("m.room.member", joining_user)].membership, "join")
 
+    @override_config({"experimental_features": {"msc3706_enabled": True}})
     def test_send_join_partial_state(self) -> None:
-        """/send_join should return partial state, if requested"""
+        """When MSC3706 support is enabled, /send_join should return partial state"""
         joining_user = "@misspiggy:" + self.OTHER_SERVER_NAME
         join_result = self._make_join(joining_user)
 
@@ -223,7 +224,7 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
         )
         channel = self.make_signed_federation_request(
             "PUT",
-            f"/_matrix/federation/v2/send_join/{self._room_id}/x?omit_members=true",
+            f"/_matrix/federation/v2/send_join/{self._room_id}/x?org.matrix.msc3706.partial_state=true",
             content=join_event_dict,
         )
         self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
@@ -324,7 +325,7 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
     #   is probably sufficient to reassure that the bucket is updated.
 
 
-def _create_acl_event(content: JsonDict) -> EventBase:
+def _create_acl_event(content):
     return make_event_from_dict(
         {
             "room_id": "!a:b",

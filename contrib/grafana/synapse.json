@@ -1008,7 +1008,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -1680,7 +1681,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2531,7 +2533,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -11293,7 +11296,7 @@
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "max(synapse_admin_mau_max{instance=\"$instance\"})",
+              "expr": "synapse_admin_mau_max{instance=\"$instance\", job=~\"(hhs_)?synapse\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -11307,7 +11310,7 @@
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "max(synapse_admin_mau_current{instance=\"$instance\"})",
+              "expr": "synapse_admin_mau_current{instance=\"$instance\", job=~\"(hhs_)?synapse\"}",
               "hide": false,
               "legendFormat": "Current",
               "range": true,
@@ -12757,6 +12760,6 @@
   "timezone": "",
   "title": "Synapse",
   "uid": "000000012",
-  "version": 150,
+  "version": 149,
   "weekStart": ""
 }

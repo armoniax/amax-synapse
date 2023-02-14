@@ -19,15 +19,13 @@ from zope.interface import implementer
 
 from OpenSSL import SSL
 from OpenSSL.SSL import Connection
-from twisted.internet.address import IPv4Address
 from twisted.internet.interfaces import IOpenSSLServerConnectionCreator
 from twisted.internet.ssl import Certificate, trustRootFromCertificates
-from twisted.protocols.tls import TLSMemoryBIOProtocol
 from twisted.web.client import BrowserLikePolicyForHTTPS  # noqa: F401
 from twisted.web.iweb import IPolicyForHTTPS  # noqa: F401
 
 
-def get_test_https_policy() -> BrowserLikePolicyForHTTPS:
+def get_test_https_policy():
     """Get a test IPolicyForHTTPS which trusts the test CA cert
 
     Returns:
@@ -41,7 +39,7 @@ def get_test_https_policy() -> BrowserLikePolicyForHTTPS:
     return BrowserLikePolicyForHTTPS(trustRoot=trust_root)
 
 
-def get_test_ca_cert_file() -> str:
+def get_test_ca_cert_file():
     """Get the path to the test CA cert
 
     The keypair is generated with:
@@ -53,7 +51,7 @@ def get_test_ca_cert_file() -> str:
     return os.path.join(os.path.dirname(__file__), "ca.crt")
 
 
-def get_test_key_file() -> str:
+def get_test_key_file():
     """get the path to the test key
 
     The key file is made with:
@@ -139,20 +137,15 @@ class TestServerTLSConnectionFactory:
     """An SSL connection creator which returns connections which present a certificate
     signed by our test CA."""
 
-    def __init__(self, sanlist: List[bytes]):
+    def __init__(self, sanlist):
         """
         Args:
-            sanlist: a list of subjectAltName values for the cert
+            sanlist: list[bytes]: a list of subjectAltName values for the cert
         """
         self._cert_file = create_test_cert_file(sanlist)
 
-    def serverConnectionForTLS(self, tlsProtocol: TLSMemoryBIOProtocol) -> Connection:
+    def serverConnectionForTLS(self, tlsProtocol):
         ctx = SSL.Context(SSL.SSLv23_METHOD)
         ctx.use_certificate_file(self._cert_file)
         ctx.use_privatekey_file(get_test_key_file())
         return Connection(ctx, None)
-
-
-# A dummy address, useful for tests that use FakeTransport and don't care about where
-# packets are going to/coming from.
-dummy_address = IPv4Address("TCP", "127.0.0.1", 80)

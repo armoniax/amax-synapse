@@ -80,7 +80,6 @@ from synapse.types import (
     PersistedEventPosition,
     RoomStreamToken,
     StateMap,
-    StrCollection,
     UserID,
     get_domain_from_id,
 )
@@ -611,12 +610,10 @@ class FederationEventHandler:
             self._state_storage_controller.notify_event_un_partial_stated(
                 event.event_id
             )
-            # Notify that there's a new row in the un_partial_stated_events stream.
-            self._notifier.notify_replication()
 
     @trace
     async def backfill(
-        self, dest: str, room_id: str, limit: int, extremities: StrCollection
+        self, dest: str, room_id: str, limit: int, extremities: Collection[str]
     ) -> None:
         """Trigger a backfill request to `dest` for the given `room_id`
 
@@ -1424,7 +1421,7 @@ class FederationEventHandler:
         """
 
         try:
-            await self._store.mark_remote_users_device_caches_as_stale((sender,))
+            await self._store.mark_remote_user_device_cache_as_stale(sender)
 
             # Immediately attempt a resync in the background
             if self._config.worker.worker_app:
@@ -1566,7 +1563,7 @@ class FederationEventHandler:
     @trace
     @tag_args
     async def _get_events_and_persist(
-        self, destination: str, room_id: str, event_ids: StrCollection
+        self, destination: str, room_id: str, event_ids: Collection[str]
     ) -> None:
         """Fetch the given events from a server, and persist them as outliers.
 
@@ -2259,10 +2256,6 @@ class FederationEventHandler:
             ) = await self._storage_controllers.persistence.persist_events(
                 event_and_contexts, backfilled=backfilled
             )
-
-            # After persistence we always need to notify replication there may
-            # be new data.
-            self._notifier.notify_replication()
 
             if self._ephemeral_messages_enabled:
                 for event in events:

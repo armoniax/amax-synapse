@@ -19,7 +19,6 @@ from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple, cast
 import attr
 from canonicaljson import encode_canonical_json
 
-from synapse.api.constants import Direction
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import db_to_json
 from synapse.storage.database import (
@@ -497,7 +496,7 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
         limit: int,
         destination: Optional[str] = None,
         order_by: str = DestinationSortOrder.DESTINATION.value,
-        direction: Direction = Direction.FORWARDS,
+        direction: str = "f",
     ) -> Tuple[List[JsonDict], int]:
         """Function to retrieve a paginated list of destinations.
         This will return a json list of destinations and the
@@ -519,7 +518,7 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
         ) -> Tuple[List[JsonDict], int]:
             order_by_column = DestinationSortOrder(order_by).value
 
-            if direction == Direction.BACKWARDS:
+            if direction == "b":
                 order = "DESC"
             else:
                 order = "ASC"
@@ -551,11 +550,7 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
         )
 
     async def get_destination_rooms_paginate(
-        self,
-        destination: str,
-        start: int,
-        limit: int,
-        direction: Direction = Direction.FORWARDS,
+        self, destination: str, start: int, limit: int, direction: str = "f"
     ) -> Tuple[List[JsonDict], int]:
         """Function to retrieve a paginated list of destination's rooms.
         This will return a json list of rooms and the
@@ -574,7 +569,7 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
             txn: LoggingTransaction,
         ) -> Tuple[List[JsonDict], int]:
 
-            if direction == Direction.BACKWARDS:
+            if direction == "b":
                 order = "DESC"
             else:
                 order = "ASC"

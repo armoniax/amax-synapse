@@ -46,7 +46,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         m = Mock()
 
-        def post_json_get_json(url: str, body: JsonDict) -> Deferred:
+        def post_json_get_json(url, body):
             d: Deferred = Deferred()
             self.push_attempts.append((d, url, body))
             return make_deferred_yieldable(d)

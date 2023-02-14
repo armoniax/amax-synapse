@@ -17,11 +17,7 @@
 import copy
 from unittest import mock
 
-from twisted.test.proto_helpers import MemoryReactor
-
 from synapse.api.errors import SynapseError
-from synapse.server import HomeServer
-from synapse.util import Clock
 
 from tests import unittest
 
@@ -43,14 +39,14 @@ room_keys = {
 
 
 class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
-    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
+    def make_homeserver(self, reactor, clock):
         return self.setup_test_homeserver(replication_layer=mock.Mock())
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+    def prepare(self, reactor, clock, hs):
         self.handler = hs.get_e2e_room_keys_handler()
         self.local_user = "@boris:" + hs.hostname
 
-    def test_get_missing_current_version_info(self) -> None:
+    def test_get_missing_current_version_info(self):
         """Check that we get a 404 if we ask for info about the current version
         if there is no version.
         """
@@ -60,7 +56,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
         res = e.value.code
         self.assertEqual(res, 404)
 
-    def test_get_missing_version_info(self) -> None:
+    def test_get_missing_version_info(self):
         """Check that we get a 404 if we ask for info about a specific version
         if it doesn't exist.
         """
@@ -71,9 +67,9 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
         res = e.value.code
         self.assertEqual(res, 404)
 
-    def test_create_version(self) -> None:
+    def test_create_version(self):
         """Check that we can create and then retrieve versions."""
-        version = self.get_success(
+        res = self.get_success(
             self.handler.create_version(
                 self.local_user,
                 {
@@ -82,7 +78,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
                 },
             )
         )
-        self.assertEqual(version, "1")
+        self.assertEqual(res, "1")
 
         # check we can retrieve it as the current version
         res = self.get_success(self.handler.get_version_info(self.local_user))
@@ -114,7 +110,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
         )
 
         # upload a new one...
-        version = self.get_success(
+        res = self.get_success(
             self.handler.create_version(
                 self.local_user,
                 {
@@ -123,7 +119,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
                 },
             )
         )
-        self.assertEqual(version, "2")
+        self.assertEqual(res, "2")
 
         # check we can retrieve it as the current version
         res = self.get_success(self.handler.get_version_info(self.local_user))
@@ -138,7 +134,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
             },
         )
 
-    def test_update_version(self) -> None:
+    def test_update_version(self):
         """Check that we can update versions."""
         version = self.get_success(
             self.handler.create_version(
@@ -177,7 +173,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
             },
         )
 
-    def test_update_missing_version(self) -> None:
+    def test_update_missing_version(self):
         """Check that we get a 404 on updating nonexistent versions"""
         e = self.get_failure(
             self.handler.update_version(
@@ -194,7 +190,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
         res = e.value.code
         self.assertEqual(res, 404)
 
-    def test_update_omitted_version(self) -> None:
+    def test_update_omitted_version(self):
         """Check that the update succeeds if the version is missing from the body"""
         version = self.get_success(
             self.handler.create_version(
@@ -231,7 +227,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
             },
         )
 
-    def test_update_bad_version(self) -> None:
+    def test_update_bad_version(self):
         """Check that we get a 400 if the version in the body doesn't match"""
         version = self.get_success(
             self.handler.create_version(
@@ -259,7 +255,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
         res = e.value.code
         self.assertEqual(res, 400)
 
-    def test_delete_missing_version(self) -> None:
+    def test_delete_missing_version(self):
         """Check that we get a 404 on deleting nonexistent versions"""
         e = self.get_failure(
             self.handler.delete_version(self.local_user, "1"), SynapseError
@@ -267,15 +263,15 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
         res = e.value.code
         self.assertEqual(res, 404)
 
-    def test_delete_missing_current_version(self) -> None:
+    def test_delete_missing_current_version(self):
         """Check that we get a 404 on deleting nonexistent current version"""
         e = self.get_failure(self.handler.delete_version(self.local_user), SynapseError)
         res = e.value.code
         self.assertEqual(res, 404)
 
-    def test_delete_version(self) -> None:
+    def test_delete_version(self):
         """Check that we can create and then delete versions."""
-        version = self.get_success(
+        res = self.get_success(
             self.handler.create_version(
                 self.local_user,
                 {
@@ -284,7 +280,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
                 },
             )
         )
-        self.assertEqual(version, "1")
+        self.assertEqual(res, "1")
 
         # check we can delete it
         self.get_success(self.handler.delete_version(self.local_user, "1"))
@@ -296,7 +292,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
         res = e.value.code
         self.assertEqual(res, 404)
 
-    def test_get_missing_backup(self) -> None:
+    def test_get_missing_backup(self):
         """Check that we get a 404 on querying missing backup"""
         e = self.get_failure(
             self.handler.get_room_keys(self.local_user, "bogus_version"), SynapseError
@@ -304,7 +300,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
         res = e.value.code
         self.assertEqual(res, 404)
 
-    def test_get_missing_room_keys(self) -> None:
+    def test_get_missing_room_keys(self):
         """Check we get an empty response from an empty backup"""
         version = self.get_success(
             self.handler.create_version(
@@ -323,7 +319,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
     # TODO: test the locking semantics when uploading room_keys,
     # although this is probably best done in sytest
 
-    def test_upload_room_keys_no_versions(self) -> None:
+    def test_upload_room_keys_no_versions(self):
         """Check that we get a 404 on uploading keys when no versions are defined"""
         e = self.get_failure(
             self.handler.upload_room_keys(self.local_user, "no_version", room_keys),
@@ -332,7 +328,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
         res = e.value.code
         self.assertEqual(res, 404)
 
-    def test_upload_room_keys_bogus_version(self) -> None:
+    def test_upload_room_keys_bogus_version(self):
         """Check that we get a 404 on uploading keys when an nonexistent version
         is specified
         """
@@ -354,7 +350,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
         res = e.value.code
         self.assertEqual(res, 404)
 
-    def test_upload_room_keys_wrong_version(self) -> None:
+    def test_upload_room_keys_wrong_version(self):
         """Check that we get a 403 on uploading keys for an old version"""
         version = self.get_success(
             self.handler.create_version(
@@ -384,7 +380,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
         res = e.value.code
         self.assertEqual(res, 403)
 
-    def test_upload_room_keys_insert(self) -> None:
+    def test_upload_room_keys_insert(self):
         """Check that we can insert and retrieve keys for a session"""
         version = self.get_success(
             self.handler.create_version(
@@ -420,7 +416,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
         )
         self.assertDictEqual(res, room_keys)
 
-    def test_upload_room_keys_merge(self) -> None:
+    def test_upload_room_keys_merge(self):
         """Check that we can upload a new room_key for an existing session and
         have it correctly merged"""
         version = self.get_success(
@@ -453,11 +449,9 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
             self.handler.upload_room_keys(self.local_user, version, new_room_keys)
         )
 
-        res_keys = self.get_success(
-            self.handler.get_room_keys(self.local_user, version)
-        )
+        res = self.get_success(self.handler.get_room_keys(self.local_user, version))
         self.assertEqual(
-            res_keys["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]["session_data"],
+            res["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]["session_data"],
             "SSBBTSBBIEZJU0gK",
         )
 
@@ -471,12 +465,9 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
             self.handler.upload_room_keys(self.local_user, version, new_room_keys)
         )
 
-        res_keys = self.get_success(
-            self.handler.get_room_keys(self.local_user, version)
-        )
+        res = self.get_success(self.handler.get_room_keys(self.local_user, version))
         self.assertEqual(
-            res_keys["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]["session_data"],
-            "new",
+            res["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]["session_data"], "new"
         )
 
         # the etag should NOT be equal now, since the key changed
@@ -492,12 +483,9 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
             self.handler.upload_room_keys(self.local_user, version, new_room_keys)
         )
 
-        res_keys = self.get_success(
-            self.handler.get_room_keys(self.local_user, version)
-        )
+        res = self.get_success(self.handler.get_room_keys(self.local_user, version))
         self.assertEqual(
-            res_keys["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]["session_data"],
-            "new",
+            res["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]["session_data"], "new"
         )
 
         # the etag should be the same since the session did not change
@@ -506,7 +494,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
 
         # TODO: check edge cases as well as the common variations here
 
-    def test_delete_room_keys(self) -> None:
+    def test_delete_room_keys(self):
         """Check that we can insert and delete keys for a session"""
         version = self.get_success(
             self.handler.create_version(

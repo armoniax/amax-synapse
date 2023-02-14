@@ -27,11 +27,10 @@ ROOM_ID_2 = "!foo:blue"
 
 
 class TypingStreamTestCase(BaseStreamTestCase):
-    def _build_replication_data_handler(self) -> Mock:
-        self.mock_handler = Mock(wraps=super()._build_replication_data_handler())
-        return self.mock_handler
+    def _build_replication_data_handler(self):
+        return Mock(wraps=super()._build_replication_data_handler())
 
-    def test_typing(self) -> None:
+    def test_typing(self):
         typing = self.hs.get_typing_handler()
 
         self.reconnect()
@@ -44,8 +43,8 @@ class TypingStreamTestCase(BaseStreamTestCase):
         request = self.handle_http_replication_attempt()
         self.assert_request_is_get_repl_stream_updates(request, "typing")
 
-        self.mock_handler.on_rdata.assert_called_once()
-        stream_name, _, token, rdata_rows = self.mock_handler.on_rdata.call_args[0]
+        self.test_handler.on_rdata.assert_called_once()
+        stream_name, _, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
         self.assertEqual(stream_name, "typing")
         self.assertEqual(1, len(rdata_rows))
         row: TypingStream.TypingStreamRow = rdata_rows[0]
@@ -55,11 +54,11 @@ class TypingStreamTestCase(BaseStreamTestCase):
         # Now let's disconnect and insert some data.
         self.disconnect()
 
-        self.mock_handler.on_rdata.reset_mock()
+        self.test_handler.on_rdata.reset_mock()
 
         typing._push_update(member=RoomMember(ROOM_ID, USER_ID), typing=False)
 
-        self.mock_handler.on_rdata.assert_not_called()
+        self.test_handler.on_rdata.assert_not_called()
 
         self.reconnect()
         self.pump(0.1)
@@ -72,15 +71,15 @@ class TypingStreamTestCase(BaseStreamTestCase):
         assert request.args is not None
         self.assertEqual(int(request.args[b"from_token"][0]), token)
 
-        self.mock_handler.on_rdata.assert_called_once()
-        stream_name, _, token, rdata_rows = self.mock_handler.on_rdata.call_args[0]
+        self.test_handler.on_rdata.assert_called_once()
+        stream_name, _, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
         self.assertEqual(stream_name, "typing")
         self.assertEqual(1, len(rdata_rows))
         row = rdata_rows[0]
         self.assertEqual(ROOM_ID, row.room_id)
         self.assertEqual([], row.user_ids)
 
-    def test_reset(self) -> None:
+    def test_reset(self):
         """
         Test what happens when a typing stream resets.
 
@@ -99,8 +98,8 @@ class TypingStreamTestCase(BaseStreamTestCase):
         request = self.handle_http_replication_attempt()
         self.assert_request_is_get_repl_stream_updates(request, "typing")
 
-        self.mock_handler.on_rdata.assert_called_once()
-        stream_name, _, token, rdata_rows = self.mock_handler.on_rdata.call_args[0]
+        self.test_handler.on_rdata.assert_called_once()
+        stream_name, _, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
         self.assertEqual(stream_name, "typing")
         self.assertEqual(1, len(rdata_rows))
         row: TypingStream.TypingStreamRow = rdata_rows[0]
@@ -135,15 +134,15 @@ class TypingStreamTestCase(BaseStreamTestCase):
         self.assert_request_is_get_repl_stream_updates(request, "typing")
 
         # Reset the test code.
-        self.mock_handler.on_rdata.reset_mock()
-        self.mock_handler.on_rdata.assert_not_called()
+        self.test_handler.on_rdata.reset_mock()
+        self.test_handler.on_rdata.assert_not_called()
 
         # Push additional data.
         typing._push_update(member=RoomMember(ROOM_ID_2, USER_ID_2), typing=False)
         self.reactor.advance(0)
 
-        self.mock_handler.on_rdata.assert_called_once()
-        stream_name, _, token, rdata_rows = self.mock_handler.on_rdata.call_args[0]
+        self.test_handler.on_rdata.assert_called_once()
+        stream_name, _, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
         self.assertEqual(stream_name, "typing")
         self.assertEqual(1, len(rdata_rows))
         row = rdata_rows[0]

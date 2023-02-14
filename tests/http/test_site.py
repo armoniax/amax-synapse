@@ -13,20 +13,18 @@
 # limitations under the License.
 
 from twisted.internet.address import IPv6Address
-from twisted.test.proto_helpers import MemoryReactor, StringTransport
+from twisted.test.proto_helpers import StringTransport
 
 from synapse.app.homeserver import SynapseHomeServer
-from synapse.server import HomeServer
-from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
 
 class SynapseRequestTestCase(HomeserverTestCase):
-    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
+    def make_homeserver(self, reactor, clock):
         return self.setup_test_homeserver(homeserver_to_use=SynapseHomeServer)
 
-    def test_large_request(self) -> None:
+    def test_large_request(self):
         """overlarge HTTP requests should be rejected"""
         self.hs.start_listening()
 

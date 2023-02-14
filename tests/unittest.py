@@ -75,7 +75,6 @@ from synapse.util.httpresourcetree import create_resource_tree
 from tests.server import (
     CustomHeaderType,
     FakeChannel,
-    ThreadedMemoryReactorClock,
     get_clock,
     make_request,
     setup_test_homeserver,
@@ -361,7 +360,7 @@ class HomeserverTestCase(TestCase):
                 store.db_pool.updates.do_next_background_update(False), by=0.1
             )
 
-    def make_homeserver(self, reactor: ThreadedMemoryReactorClock, clock: Clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock):
         """
         Make and return a homeserver.
 

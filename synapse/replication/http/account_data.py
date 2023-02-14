@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Tuple
 from twisted.web.server import Request
 
 from synapse.http.server import HttpServer
+from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
 from synapse.types import JsonDict
 
@@ -27,7 +28,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ReplicationAddUserAccountDataRestServlet(ReplicationEndpoint):
+class ReplicationUserAccountDataRestServlet(ReplicationEndpoint):
     """Add user account data on the appropriate account data worker.
 
     Request format:
@@ -48,6 +49,7 @@ class ReplicationAddUserAccountDataRestServlet(ReplicationEndpoint):
         super().__init__(hs)
 
         self.handler = hs.get_account_data_handler()
+        self.clock = hs.get_clock()
 
     @staticmethod
     async def _serialize_payload(  # type: ignore[override]
@@ -60,8 +62,10 @@ class ReplicationAddUserAccountDataRestServlet(ReplicationEndpoint):
         return payload
 
     async def _handle_request(  # type: ignore[override]
-        self, request: Request, content: JsonDict, user_id: str, account_data_type: str
+        self, request: Request, user_id: str, account_data_type: str
     ) -> Tuple[int, JsonDict]:
+        content = parse_json_object_from_request(request)
+
         max_stream_id = await self.handler.add_account_data_for_user(
             user_id, account_data_type, content["content"]
         )
@@ -69,45 +73,7 @@ class ReplicationAddUserAccountDataRestServlet(ReplicationEndpoint):
         return 200, {"max_stream_id": max_stream_id}
 
 
-class ReplicationRemoveUserAccountDataRestServlet(ReplicationEndpoint):
-    """Remove user account data on the appropriate account data worker.
-
-    Request format:
-
-        POST /_synapse/replication/remove_user_account_data/:user_id/:type
-
-        {
-            "content": { ... },
-        }
-
-    """
-
-    NAME = "remove_user_account_data"
-    PATH_ARGS = ("user_id", "account_data_type")
-    CACHE = False
-
-    def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
-        self.handler = hs.get_account_data_handler()
-
-    @staticmethod
-    async def _serialize_payload(  # type: ignore[override]
-        user_id: str, account_data_type: str
-    ) -> JsonDict:
-        return {}
-
-    async def _handle_request(  # type: ignore[override]
-        self, request: Request, content: JsonDict, user_id: str, account_data_type: str
-    ) -> Tuple[int, JsonDict]:
-        max_stream_id = await self.handler.remove_account_data_for_user(
-            user_id, account_data_type
-        )
-
-        return 200, {"max_stream_id": max_stream_id}
-
-
-class ReplicationAddRoomAccountDataRestServlet(ReplicationEndpoint):
+class ReplicationRoomAccountDataRestServlet(ReplicationEndpoint):
     """Add room account data on the appropriate account data worker.
 
     Request format:
@@ -128,6 +94,7 @@ class ReplicationAddRoomAccountDataRestServlet(ReplicationEndpoint):
         super().__init__(hs)
 
         self.handler = hs.get_account_data_handler()
+        self.clock = hs.get_clock()
 
     @staticmethod
     async def _serialize_payload(  # type: ignore[override]
@@ -140,58 +107,12 @@ class ReplicationAddRoomAccountDataRestServlet(ReplicationEndpoint):
         return payload
 
     async def _handle_request(  # type: ignore[override]
-        self,
-        request: Request,
-        content: JsonDict,
-        user_id: str,
-        room_id: str,
-        account_data_type: str,
+        self, request: Request, user_id: str, room_id: str, account_data_type: str
     ) -> Tuple[int, JsonDict]:
+        content = parse_json_object_from_request(request)
+
         max_stream_id = await self.handler.add_account_data_to_room(
             user_id, room_id, account_data_type, content["content"]
-        )
-
-        return 200, {"max_stream_id": max_stream_id}
-
-
-class ReplicationRemoveRoomAccountDataRestServlet(ReplicationEndpoint):
-    """Remove room account data on the appropriate account data worker.
-
-    Request format:
-
-        POST /_synapse/replication/remove_room_account_data/:user_id/:room_id/:account_data_type
-
-        {
-            "content": { ... },
-        }
-
-    """
-
-    NAME = "remove_room_account_data"
-    PATH_ARGS = ("user_id", "room_id", "account_data_type")
-    CACHE = False
-
-    def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
-        self.handler = hs.get_account_data_handler()
-
-    @staticmethod
-    async def _serialize_payload(  # type: ignore[override]
-        user_id: str, room_id: str, account_data_type: str, content: JsonDict
-    ) -> JsonDict:
-        return {}
-
-    async def _handle_request(  # type: ignore[override]
-        self,
-        request: Request,
-        content: JsonDict,
-        user_id: str,
-        room_id: str,
-        account_data_type: str,
-    ) -> Tuple[int, JsonDict]:
-        max_stream_id = await self.handler.remove_account_data_for_room(
-            user_id, room_id, account_data_type
         )
 
         return 200, {"max_stream_id": max_stream_id}
@@ -218,6 +139,7 @@ class ReplicationAddTagRestServlet(ReplicationEndpoint):
         super().__init__(hs)
 
         self.handler = hs.get_account_data_handler()
+        self.clock = hs.get_clock()
 
     @staticmethod
     async def _serialize_payload(  # type: ignore[override]
@@ -230,8 +152,10 @@ class ReplicationAddTagRestServlet(ReplicationEndpoint):
         return payload
 
     async def _handle_request(  # type: ignore[override]
-        self, request: Request, content: JsonDict, user_id: str, room_id: str, tag: str
+        self, request: Request, user_id: str, room_id: str, tag: str
     ) -> Tuple[int, JsonDict]:
+        content = parse_json_object_from_request(request)
+
         max_stream_id = await self.handler.add_tag_to_room(
             user_id, room_id, tag, content["content"]
         )
@@ -262,6 +186,7 @@ class ReplicationRemoveTagRestServlet(ReplicationEndpoint):
         super().__init__(hs)
 
         self.handler = hs.get_account_data_handler()
+        self.clock = hs.get_clock()
 
     @staticmethod
     async def _serialize_payload(user_id: str, room_id: str, tag: str) -> JsonDict:  # type: ignore[override]
@@ -269,7 +194,7 @@ class ReplicationRemoveTagRestServlet(ReplicationEndpoint):
         return {}
 
     async def _handle_request(  # type: ignore[override]
-        self, request: Request, content: JsonDict, user_id: str, room_id: str, tag: str
+        self, request: Request, user_id: str, room_id: str, tag: str
     ) -> Tuple[int, JsonDict]:
         max_stream_id = await self.handler.remove_tag_from_room(
             user_id,
@@ -281,11 +206,7 @@ class ReplicationRemoveTagRestServlet(ReplicationEndpoint):
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
-    ReplicationAddUserAccountDataRestServlet(hs).register(http_server)
-    ReplicationAddRoomAccountDataRestServlet(hs).register(http_server)
+    ReplicationUserAccountDataRestServlet(hs).register(http_server)
+    ReplicationRoomAccountDataRestServlet(hs).register(http_server)
     ReplicationAddTagRestServlet(hs).register(http_server)
     ReplicationRemoveTagRestServlet(hs).register(http_server)
-
-    if hs.config.experimental.msc3391_enabled:
-        ReplicationRemoveUserAccountDataRestServlet(hs).register(http_server)
-        ReplicationRemoveRoomAccountDataRestServlet(hs).register(http_server)

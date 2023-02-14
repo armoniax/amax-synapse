@@ -13,28 +13,25 @@
 # limitations under the License.
 import email.message
 import os
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Dict, List, Sequence, Tuple
 
 import attr
 import pkg_resources
 
 from twisted.internet.defer import Deferred
-from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.api.errors import Codes, SynapseError
 from synapse.rest.client import login, room
-from synapse.server import HomeServer
-from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
 
-@attr.s(auto_attribs=True)
+@attr.s
 class _User:
     "Helper wrapper for user ID and access token"
-    id: str
-    token: str
+    id = attr.ib()
+    token = attr.ib()
 
 
 class EmailPusherTests(HomeserverTestCase):
@@ -44,9 +41,10 @@ class EmailPusherTests(HomeserverTestCase):
         room.register_servlets,
         login.register_servlets,
     ]
+    user_id = True
     hijack_auth = False
 
-    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
+    def make_homeserver(self, reactor, clock):
 
         config = self.default_config()
         config["email"] = {
@@ -74,17 +72,17 @@ class EmailPusherTests(HomeserverTestCase):
         # List[Tuple[Deferred, args, kwargs]]
         self.email_attempts: List[Tuple[Deferred, Sequence, Dict]] = []
 
-        def sendmail(*args: Any, **kwargs: Any) -> Deferred:
+        def sendmail(*args, **kwargs):
             # This mocks out synapse.reactor.send_email._sendmail.
-            d: Deferred = Deferred()
+            d = Deferred()
             self.email_attempts.append((d, args, kwargs))
             return d
 
-        hs.get_send_email_handler()._sendmail = sendmail  # type: ignore[assignment]
+        hs.get_send_email_handler()._sendmail = sendmail
 
         return hs
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+    def prepare(self, reactor, clock, hs):
         # Register the user who gets notified
         self.user_id = self.register_user("user", "pass")
         self.access_token = self.login("user", "pass")
@@ -131,7 +129,7 @@ class EmailPusherTests(HomeserverTestCase):
         self.auth_handler = hs.get_auth_handler()
         self.store = hs.get_datastores().main
 
-    def test_need_validated_email(self) -> None:
+    def test_need_validated_email(self):
         """Test that we can only add an email pusher if the user has validated
         their email.
         """
@@ -153,7 +151,7 @@ class EmailPusherTests(HomeserverTestCase):
         self.assertEqual(400, cm.exception.code)
         self.assertEqual(Codes.THREEPID_NOT_FOUND, cm.exception.errcode)
 
-    def test_simple_sends_email(self) -> None:
+    def test_simple_sends_email(self):
         # Create a simple room with two users
         room = self.helper.create_room_as(self.user_id, tok=self.access_token)
         self.helper.invite(
@@ -173,7 +171,7 @@ class EmailPusherTests(HomeserverTestCase):
 
         self._check_for_mail()
 
-    def test_invite_sends_email(self) -> None:
+    def test_invite_sends_email(self):
         # Create a room and invite the user to it
         room = self.helper.create_room_as(self.others[0].id, tok=self.others[0].token)
         self.helper.invite(
@@ -186,7 +184,7 @@ class EmailPusherTests(HomeserverTestCase):
         # We should get emailed about the invite
         self._check_for_mail()
 
-    def test_invite_to_empty_room_sends_email(self) -> None:
+    def test_invite_to_empty_room_sends_email(self):
         # Create a room and invite the user to it
         room = self.helper.create_room_as(self.others[0].id, tok=self.others[0].token)
         self.helper.invite(
@@ -202,7 +200,7 @@ class EmailPusherTests(HomeserverTestCase):
         # We should get emailed about the invite
         self._check_for_mail()
 
-    def test_multiple_members_email(self) -> None:
+    def test_multiple_members_email(self):
         # We want to test multiple notifications, so we pause processing of push
         # while we send messages.
         self.pusher._pause_processing()
@@ -229,7 +227,7 @@ class EmailPusherTests(HomeserverTestCase):
         # We should get emailed about those messages
         self._check_for_mail()
 
-    def test_multiple_rooms(self) -> None:
+    def test_multiple_rooms(self):
         # We want to test multiple notifications from multiple rooms, so we pause
         # processing of push while we send messages.
         self.pusher._pause_processing()
@@ -259,7 +257,7 @@ class EmailPusherTests(HomeserverTestCase):
         # We should get emailed about those messages
         self._check_for_mail()
 
-    def test_room_notifications_include_avatar(self) -> None:
+    def test_room_notifications_include_avatar(self):
         # Create a room and set its avatar.
         room = self.helper.create_room_as(self.user_id, tok=self.access_token)
         self.helper.send_state(
@@ -292,7 +290,7 @@ class EmailPusherTests(HomeserverTestCase):
         )
         self.assertIn("_matrix/media/v1/thumbnail/DUMMY_MEDIA_ID", html)
 
-    def test_empty_room(self) -> None:
+    def test_empty_room(self):
         """All users leaving a room shouldn't cause the pusher to break."""
         # Create a simple room with two users
         room = self.helper.create_room_as(self.user_id, tok=self.access_token)
@@ -311,7 +309,7 @@ class EmailPusherTests(HomeserverTestCase):
         # We should get emailed about that message
         self._check_for_mail()
 
-    def test_empty_room_multiple_messages(self) -> None:
+    def test_empty_room_multiple_messages(self):
         """All users leaving a room shouldn't cause the pusher to break."""
         # Create a simple room with two users
         room = self.helper.create_room_as(self.user_id, tok=self.access_token)
@@ -331,7 +329,7 @@ class EmailPusherTests(HomeserverTestCase):
         # We should get emailed about that message
         self._check_for_mail()
 
-    def test_encrypted_message(self) -> None:
+    def test_encrypted_message(self):
         room = self.helper.create_room_as(self.user_id, tok=self.access_token)
         self.helper.invite(
             room=room, src=self.user_id, tok=self.access_token, targ=self.others[0].id
@@ -344,7 +342,7 @@ class EmailPusherTests(HomeserverTestCase):
         # We should get emailed about that message
         self._check_for_mail()
 
-    def test_no_email_sent_after_removed(self) -> None:
+    def test_no_email_sent_after_removed(self):
         # Create a simple room with two users
         room = self.helper.create_room_as(self.user_id, tok=self.access_token)
         self.helper.invite(
@@ -381,7 +379,7 @@ class EmailPusherTests(HomeserverTestCase):
         pushers = list(pushers)
         self.assertEqual(len(pushers), 0)
 
-    def test_remove_unlinked_pushers_background_job(self) -> None:
+    def test_remove_unlinked_pushers_background_job(self):
         """Checks that all existing pushers associated with unlinked email addresses are removed
         upon running the remove_deleted_email_pushers background update.
         """

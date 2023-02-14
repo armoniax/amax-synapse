@@ -92,7 +92,6 @@ class MacaroonGeneratorTestCase(TestCase):
             nonce="nonce",
             client_redirect_url="https://example.com/",
             ui_auth_session_id="",
-            code_verifier="",
         )
         token = self.macaroon_generator.generate_oidc_session_token(
             state, session_data, duration_in_ms=2 * 60 * 1000

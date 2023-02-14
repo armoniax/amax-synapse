@@ -67,7 +67,7 @@ pipx install poetry
 but see poetry's [installation instructions](https://python-poetry.org/docs/#installation)
 for other installation methods.
 
-Developing Synapse requires Poetry version 1.3.2 or later.
+Synapse requires Poetry version 1.2.0 or later.
 
 Next, open a terminal and install dependencies as follows:
 
@@ -106,8 +106,8 @@ regarding Synapse's Admin API, which is used mostly by sysadmins and external
 service developers.
 
 Synapse's code style is documented [here](../code_style.md). Please follow
-it, including the conventions for [configuration
-options and documentation](../code_style.md#configuration-code-and-documentation-format).
+it, including the conventions for the [sample configuration
+file](../code_style.md#configuration-file-format).
 
 We welcome improvements and additions to our documentation itself! When
 writing new pages, please
@@ -126,7 +126,7 @@ changes to the Rust code.
 
 
 # 8. Test, test, test!
-<a name="test-test-test" id="test-test-test"></a>
+<a name="test-test-test"></a>
 
 While you're developing and before submitting a patch, you'll
 want to test your code.
@@ -332,7 +332,6 @@ The above will run a monolithic (single-process) Synapse with SQLite as the data
     [here](https://github.com/matrix-org/synapse/blob/develop/docker/configure_workers_and_start.py#L54).
     A safe example would be `WORKER_TYPES="federation_inbound, federation_sender, synchrotron"`.
     See the [worker documentation](../workers.md) for additional information on workers.
-- Passing `ASYNCIO_REACTOR=1` as an environment variable to use the Twisted asyncio reactor instead of the default one.
 
 To increase the log level for the tests, set `SYNAPSE_TEST_LOG_LEVEL`, e.g:
 ```sh
@@ -383,7 +382,7 @@ To prepare a Pull Request, please:
 ## Changelog
 
 All changes, even minor ones, need a corresponding changelog / newsfragment
-entry. These are managed by [Towncrier](https://github.com/twisted/towncrier).
+entry. These are managed by [Towncrier](https://github.com/hawkowl/towncrier).
 
 To create a changelog entry, make a new file in the `changelog.d` directory named
 in the format of `PRnumber.type`. The type can be one of the following:
@@ -425,7 +424,8 @@ chicken-and-egg problem.
 There are two options for solving this:
 
 1. Open the PR without a changelog file, see what number you got, and *then*
-   add the changelog file to your branch, or:
+   add the changelog file to your branch (see [Updating your pull
+   request](#updating-your-pull-request)), or:
 
 1. Look at the [list of all
    issues/PRs](https://github.com/matrix-org/synapse/issues?q=), add one to the

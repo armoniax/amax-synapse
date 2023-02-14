@@ -14,8 +14,6 @@
 
 # Stub for PyICU.
 
-from __future__ import annotations
-
 class Locale:
     @staticmethod
     def getDefault() -> Locale: ...
