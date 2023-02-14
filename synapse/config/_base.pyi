@@ -18,7 +18,7 @@ from typing import (
 
 import jinja2
 
-from synapse.config import (  # noqa: F401
+from synapse.config import (
     account_validity,
     api,
     appservice,
@@ -202,9 +202,9 @@ def find_config_files(search_paths: List[str]) -> List[str]: ...
 class ShardedWorkerHandlingConfig:
     instances: List[str]
     def __init__(self, instances: List[str]) -> None: ...
-    def should_handle(self, instance_name: str, key: str) -> bool: ...  # noqa: F811
+    def should_handle(self, instance_name: str, key: str) -> bool: ...
 
 class RoutableShardedWorkerHandlingConfig(ShardedWorkerHandlingConfig):
-    def get_instance(self, key: str) -> str: ...  # noqa: F811
+    def get_instance(self, key: str) -> str: ...
 
 def read_file(file_path: Any, config_path: Iterable[str]) -> str: ...

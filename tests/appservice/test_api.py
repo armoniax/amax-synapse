@@ -29,7 +29,7 @@ URL = "http://mytestservice"
 
 
 class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
         self.api = hs.get_application_service_api()
         self.service = ApplicationService(
             id="unique_identifier",
@@ -39,7 +39,7 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
             hs_token=TOKEN,
         )
 
-    def test_query_3pe_authenticates_token(self) -> None:
+    def test_query_3pe_authenticates_token(self):
         """
         Tests that 3pe queries to the appservice are authenticated
         with the appservice's token.

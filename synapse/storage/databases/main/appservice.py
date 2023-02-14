@@ -14,17 +14,7 @@
 # limitations under the License.
 import logging
 import re
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    List,
-    Optional,
-    Pattern,
-    Sequence,
-    Tuple,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Pattern, Tuple, cast
 
 from synapse.appservice import (
     ApplicationService,
@@ -267,7 +257,7 @@ class ApplicationServiceTransactionWorkerStore(
     async def create_appservice_txn(
         self,
         service: ApplicationService,
-        events: Sequence[EventBase],
+        events: List[EventBase],
         ephemeral: List[JsonDict],
         to_device_messages: List[JsonDict],
         one_time_keys_count: TransactionOneTimeKeysCount,

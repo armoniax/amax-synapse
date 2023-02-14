@@ -25,14 +25,14 @@ from tests import unittest
 
 
 class ConfigGenerationTestCase(unittest.TestCase):
-    def setUp(self) -> None:
+    def setUp(self):
         self.dir = tempfile.mkdtemp()
         self.file = os.path.join(self.dir, "homeserver.yaml")
 
-    def tearDown(self) -> None:
+    def tearDown(self):
         shutil.rmtree(self.dir)
 
-    def test_generate_config_generates_files(self) -> None:
+    def test_generate_config_generates_files(self):
         with redirect_stdout(StringIO()):
             HomeServerConfig.load_or_generate_config(
                 "",
@@ -56,7 +56,7 @@ class ConfigGenerationTestCase(unittest.TestCase):
             os.path.join(os.getcwd(), "homeserver.log"),
         )
 
-    def assert_log_filename_is(self, log_config_file: str, expected: str) -> None:
+    def assert_log_filename_is(self, log_config_file, expected):
         with open(log_config_file) as f:
             config = f.read()
             # find the 'filename' line

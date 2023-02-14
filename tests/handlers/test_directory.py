@@ -20,7 +20,6 @@ from twisted.test.proto_helpers import MemoryReactor
 import synapse.api.errors
 import synapse.rest.admin
 from synapse.api.constants import EventTypes
-from synapse.events import EventBase
 from synapse.rest.client import directory, login, room
 from synapse.server import HomeServer
 from synapse.types import JsonDict, RoomAlias, create_requester
@@ -202,7 +201,7 @@ class TestDeleteAlias(unittest.HomeserverTestCase):
         self.test_user_tok = self.login("user", "pass")
         self.helper.join(room=self.room_id, user=self.test_user, tok=self.test_user_tok)
 
-    def _create_alias(self, user: str) -> None:
+    def _create_alias(self, user) -> None:
         # Create a new alias to this room.
         self.get_success(
             self.store.create_room_alias_association(
@@ -325,7 +324,7 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
         )
         return room_alias
 
-    def _set_canonical_alias(self, content: JsonDict) -> None:
+    def _set_canonical_alias(self, content) -> None:
         """Configure the canonical alias state on the room."""
         self.helper.send_state(
             self.room_id,
@@ -334,15 +333,13 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
             tok=self.admin_user_tok,
         )
 
-    def _get_canonical_alias(self) -> EventBase:
+    def _get_canonical_alias(self):
         """Get the canonical alias state of the room."""
-        result = self.get_success(
+        return self.get_success(
             self._storage_controllers.state.get_current_state_event(
                 self.room_id, EventTypes.CanonicalAlias, ""
             )
         )
-        assert result is not None
-        return result
 
     def test_remove_alias(self) -> None:
         """Removing an alias that is the canonical alias should remove it there too."""
@@ -352,8 +349,8 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
         )
 
         data = self._get_canonical_alias()
-        self.assertEqual(data.content["alias"], self.test_alias)
-        self.assertEqual(data.content["alt_aliases"], [self.test_alias])
+        self.assertEqual(data["content"]["alias"], self.test_alias)
+        self.assertEqual(data["content"]["alt_aliases"], [self.test_alias])
 
         # Finally, delete the alias.
         self.get_success(
@@ -363,8 +360,8 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
         )
 
         data = self._get_canonical_alias()
-        self.assertNotIn("alias", data.content)
-        self.assertNotIn("alt_aliases", data.content)
+        self.assertNotIn("alias", data["content"])
+        self.assertNotIn("alt_aliases", data["content"])
 
     def test_remove_other_alias(self) -> None:
         """Removing an alias listed as in alt_aliases should remove it there too."""
@@ -381,9 +378,9 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
         )
 
         data = self._get_canonical_alias()
-        self.assertEqual(data.content["alias"], self.test_alias)
+        self.assertEqual(data["content"]["alias"], self.test_alias)
         self.assertEqual(
-            data.content["alt_aliases"], [self.test_alias, other_test_alias]
+            data["content"]["alt_aliases"], [self.test_alias, other_test_alias]
         )
 
         # Delete the second alias.
@@ -394,8 +391,8 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
         )
 
         data = self._get_canonical_alias()
-        self.assertEqual(data.content["alias"], self.test_alias)
-        self.assertEqual(data.content["alt_aliases"], [self.test_alias])
+        self.assertEqual(data["content"]["alias"], self.test_alias)
+        self.assertEqual(data["content"]["alt_aliases"], [self.test_alias])
 
 
 class TestCreateAliasACL(unittest.HomeserverTestCase):

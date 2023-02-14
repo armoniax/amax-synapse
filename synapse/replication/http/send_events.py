@@ -21,6 +21,7 @@ from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase, make_event_from_dict
 from synapse.events.snapshot import EventContext
 from synapse.http.server import HttpServer
+from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
 from synapse.types import JsonDict, Requester, UserID
 from synapse.util.metrics import Measure
@@ -113,9 +114,10 @@ class ReplicationSendEventsRestServlet(ReplicationEndpoint):
         return payload
 
     async def _handle_request(  # type: ignore[override]
-        self, request: Request, payload: JsonDict
+        self, request: Request
     ) -> Tuple[int, JsonDict]:
         with Measure(self.clock, "repl_send_events_parse"):
+            payload = parse_json_object_from_request(request)
             events_and_context = []
             events = payload["events"]
 

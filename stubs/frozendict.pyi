@@ -14,8 +14,6 @@
 
 # Stub for frozendict.
 
-from __future__ import annotations
-
 from typing import Any, Hashable, Iterable, Iterator, Mapping, Tuple, TypeVar, overload
 
 _KT = TypeVar("_KT", bound=Hashable)  # Key type.

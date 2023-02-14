@@ -34,7 +34,6 @@ from twisted.logger import (
 
 from synapse.logging.context import LoggingContextFilter
 from synapse.logging.filter import MetadataFilter
-from synapse.synapse_rust import reset_logging_config
 from synapse.types import JsonDict
 
 from ..util import SYNAPSE_VERSION
@@ -201,26 +200,6 @@ def _setup_stdlib_logging(
     """
     Set up Python standard library logging.
     """
-
-    # We add a log record factory that runs all messages through the
-    # LoggingContextFilter so that we get the context *at the time we log*
-    # rather than when we write to a handler. This can be done in config using
-    # filter options, but care must when using e.g. MemoryHandler to buffer
-    # writes.
-
-    log_context_filter = LoggingContextFilter()
-    log_metadata_filter = MetadataFilter({"server_name": config.server.server_name})
-    old_factory = logging.getLogRecordFactory()
-
-    def factory(*args: Any, **kwargs: Any) -> logging.LogRecord:
-        record = old_factory(*args, **kwargs)
-        log_context_filter.filter(record)
-        log_metadata_filter.filter(record)
-        return record
-
-    logging.setLogRecordFactory(factory)
-
-    # Configure the logger with the initial configuration.
     if log_config_path is None:
         log_format = (
             "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s"
@@ -239,6 +218,24 @@ def _setup_stdlib_logging(
     else:
         # Load the logging configuration.
         _load_logging_config(log_config_path)
+
+    # We add a log record factory that runs all messages through the
+    # LoggingContextFilter so that we get the context *at the time we log*
+    # rather than when we write to a handler. This can be done in config using
+    # filter options, but care must when using e.g. MemoryHandler to buffer
+    # writes.
+
+    log_context_filter = LoggingContextFilter()
+    log_metadata_filter = MetadataFilter({"server_name": config.server.server_name})
+    old_factory = logging.getLogRecordFactory()
+
+    def factory(*args: Any, **kwargs: Any) -> logging.LogRecord:
+        record = old_factory(*args, **kwargs)
+        log_context_filter.filter(record)
+        log_metadata_filter.filter(record)
+        return record
+
+    logging.setLogRecordFactory(factory)
 
     # Route Twisted's native logging through to the standard library logging
     # system.
@@ -296,9 +293,6 @@ def _load_logging_config(log_config_path: str) -> None:
         raise ConfigError(STRUCTURED_ERROR)
 
     logging.config.dictConfig(log_config)
-
-    # Blow away the pyo3-log cache so that it reloads the configuration.
-    reset_logging_config()
 
 
 def _reload_logging_config(log_config_path: Optional[str]) -> None:

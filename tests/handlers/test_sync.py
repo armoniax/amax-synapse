@@ -14,8 +14,6 @@
 from typing import Optional
 from unittest.mock import MagicMock, Mock, patch
 
-from twisted.test.proto_helpers import MemoryReactor
-
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.api.errors import Codes, ResourceLimitError
 from synapse.api.filtering import Filtering
@@ -25,7 +23,6 @@ from synapse.rest import admin
 from synapse.rest.client import knock, login, room
 from synapse.server import HomeServer
 from synapse.types import UserID, create_requester
-from synapse.util import Clock
 
 import tests.unittest
 import tests.utils
@@ -42,7 +39,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         room.register_servlets,
     ]
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+    def prepare(self, reactor, clock, hs: HomeServer):
         self.sync_handler = self.hs.get_sync_handler()
         self.store = self.hs.get_datastores().main
 
@@ -50,7 +47,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         # modify its config instead of the hs'
         self.auth_blocking = self.hs.get_auth_blocking()
 
-    def test_wait_for_sync_for_user_auth_blocking(self) -> None:
+    def test_wait_for_sync_for_user_auth_blocking(self):
         user_id1 = "@user1:test"
         user_id2 = "@user2:test"
         sync_config = generate_sync_config(user_id1)
@@ -85,7 +82,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         )
         self.assertEqual(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
-    def test_unknown_room_version(self) -> None:
+    def test_unknown_room_version(self):
         """
         A room with an unknown room version should not break sync (and should be excluded).
         """
@@ -189,7 +186,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         self.assertNotIn(invite_room, [r.room_id for r in result.invited])
         self.assertNotIn(knock_room, [r.room_id for r in result.knocked])
 
-    def test_ban_wins_race_with_join(self) -> None:
+    def test_ban_wins_race_with_join(self):
         """Rooms shouldn't appear under "joined" if a join loses a race to a ban.
 
         A complicated edge case. Imagine the following scenario:

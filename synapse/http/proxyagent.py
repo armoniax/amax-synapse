@@ -38,6 +38,7 @@ from twisted.web.iweb import IAgent, IBodyProducer, IPolicyForHTTPS, IResponse
 
 from synapse.http import redact_uri
 from synapse.http.connectproxyclient import HTTPConnectProxyEndpoint, ProxyCredentials
+from synapse.types import ISynapseReactor
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +84,7 @@ class ProxyAgent(_AgentBase):
     def __init__(
         self,
         reactor: IReactorCore,
-        proxy_reactor: Optional[IReactorCore] = None,
+        proxy_reactor: Optional[ISynapseReactor] = None,
         contextFactory: Optional[IPolicyForHTTPS] = None,
         connectTimeout: Optional[float] = None,
         bindAddress: Optional[bytes] = None,

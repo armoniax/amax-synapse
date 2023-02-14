@@ -24,13 +24,13 @@ from tests import unittest
 
 
 class BaseConfigTestCase(unittest.TestCase):
-    def setUp(self) -> None:
+    def setUp(self):
         # The root object needs a server property with a public_baseurl.
         root = Mock()
         root.server.public_baseurl = "http://test"
         self.config = Config(root)
 
-    def test_loading_missing_templates(self) -> None:
+    def test_loading_missing_templates(self):
         # Use a temporary directory that exists on the system, but that isn't likely to
         # contain template files
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -50,7 +50,7 @@ class BaseConfigTestCase(unittest.TestCase):
             "Template file did not contain our test string",
         )
 
-    def test_loading_custom_templates(self) -> None:
+    def test_loading_custom_templates(self):
         # Use a temporary directory that exists on the system
         with tempfile.TemporaryDirectory() as tmp_dir:
             # Create a temporary bogus template file
@@ -79,7 +79,7 @@ class BaseConfigTestCase(unittest.TestCase):
             "Template file did not contain our test string",
         )
 
-    def test_multiple_custom_template_directories(self) -> None:
+    def test_multiple_custom_template_directories(self):
         """Tests that directories are searched in the right order if multiple custom
         template directories are provided.
         """
@@ -137,7 +137,7 @@ class BaseConfigTestCase(unittest.TestCase):
         for td in tempdirs:
             td.cleanup()
 
-    def test_loading_template_from_nonexistent_custom_directory(self) -> None:
+    def test_loading_template_from_nonexistent_custom_directory(self):
         with self.assertRaises(ConfigError):
             self.config.read_templates(
                 ["some_filename.html"], ("a_nonexistent_directory",)

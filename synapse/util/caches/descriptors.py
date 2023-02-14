@@ -53,9 +53,9 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 
 class CachedFunction(Generic[F]):
-    invalidate: Callable[[Tuple[Any, ...]], None]
-    invalidate_all: Callable[[], None]
-    prefill: Callable[[Tuple[Any, ...], Any], None]
+    invalidate: Any = None
+    invalidate_all: Any = None
+    prefill: Any = None
     cache: Any = None
     num_args: Any = None
 

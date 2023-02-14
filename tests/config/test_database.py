@@ -20,7 +20,7 @@ from tests import unittest
 
 
 class DatabaseConfigTestCase(unittest.TestCase):
-    def test_database_configured_correctly(self) -> None:
+    def test_database_configured_correctly(self):
         conf = yaml.safe_load(
             DatabaseConfig().generate_config_section(data_dir_path="/data_dir_path")
         )

@@ -23,7 +23,7 @@ class PartialStateStreamsTestCase(BaseMultiWorkerStreamTestCase):
     hijack_auth = True
     user_id = "@bob:test"
 
-    def setUp(self) -> None:
+    def setUp(self):
         super().setUp()
         self.store = self.hs.get_datastores().main
 

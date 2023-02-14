@@ -15,8 +15,6 @@
 from http import HTTPStatus
 from typing import Dict, List, Tuple
 
-from twisted.web.resource import Resource
-
 from synapse.api.errors import Codes
 from synapse.federation.transport.server import BaseFederationServlet
 from synapse.federation.transport.server._base import Authenticator, _parse_auth_header
@@ -64,7 +62,7 @@ class BaseFederationServletCancellationTests(unittest.FederatingHomeserverTestCa
 
     path = f"{CancellableFederationServlet.PREFIX}{CancellableFederationServlet.PATH}"
 
-    def create_test_resource(self) -> Resource:
+    def create_test_resource(self):
         """Overrides `HomeserverTestCase.create_test_resource`."""
         resource = JsonResource(self.hs)
 

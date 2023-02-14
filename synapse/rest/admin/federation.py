@@ -15,10 +15,9 @@ import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
-from synapse.api.constants import Direction
 from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.federation.transport.server import Authenticator
-from synapse.http.servlet import RestServlet, parse_enum, parse_integer, parse_string
+from synapse.http.servlet import RestServlet, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
 from synapse.storage.databases.main.transactions import DestinationSortOrder
@@ -80,7 +79,7 @@ class ListDestinationsRestServlet(RestServlet):
             allowed_values=[dest.value for dest in DestinationSortOrder],
         )
 
-        direction = parse_enum(request, "dir", Direction, default=Direction.FORWARDS)
+        direction = parse_string(request, "dir", default="f", allowed_values=("f", "b"))
 
         destinations, total = await self._store.get_destinations_paginate(
             start, limit, destination, order_by, direction
@@ -193,7 +192,7 @@ class DestinationMembershipRestServlet(RestServlet):
                 errcode=Codes.INVALID_PARAM,
             )
 
-        direction = parse_enum(request, "dir", Direction, default=Direction.FORWARDS)
+        direction = parse_string(request, "dir", default="f", allowed_values=("f", "b"))
 
         rooms, total = await self._store.get_destination_rooms_paginate(
             destination, start, limit, direction

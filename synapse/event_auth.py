@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections.abc
 import logging
 import typing
 from typing import (
@@ -875,11 +874,11 @@ def _check_power_levels(
                 "kick",
                 "invite",
             }:
-                if type(v) is not int:
+                if not isinstance(v, int):
                     raise SynapseError(400, f"{v!r} must be an integer.")
             if k in {"events", "notifications", "users"}:
-                if not isinstance(v, collections.abc.Mapping) or not all(
-                    type(v) is int for v in v.values()
+                if not isinstance(v, dict) or not all(
+                    isinstance(v, int) for v in v.values()
                 ):
                     raise SynapseError(
                         400,

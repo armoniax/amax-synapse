@@ -52,7 +52,6 @@ class StreamIdGeneratorTestCase(HomeserverTestCase):
         def _create(conn: LoggingDatabaseConnection) -> StreamIdGenerator:
             return StreamIdGenerator(
                 db_conn=conn,
-                notifier=self.hs.get_replication_notifier(),
                 table="foobar",
                 column="stream_id",
             )
@@ -197,7 +196,6 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
             return MultiWriterIdGenerator(
                 conn,
                 self.db_pool,
-                notifier=self.hs.get_replication_notifier(),
                 stream_name="test_stream",
                 instance_name=instance_name,
                 tables=[("foobar", "instance_name", "stream_id")],
@@ -351,8 +349,8 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
 
         # The first ID gen will notice that it can advance its token to 7 as it
         # has no in progress writes...
-        self.assertEqual(first_id_gen.get_positions(), {"first": 3, "second": 7})
-        self.assertEqual(first_id_gen.get_current_token_for_writer("first"), 3)
+        self.assertEqual(first_id_gen.get_positions(), {"first": 7, "second": 7})
+        self.assertEqual(first_id_gen.get_current_token_for_writer("first"), 7)
         self.assertEqual(first_id_gen.get_current_token_for_writer("second"), 7)
 
         # ... but the second ID gen doesn't know that.
@@ -368,9 +366,8 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
                 self.assertEqual(stream_id, 8)
 
                 self.assertEqual(
-                    first_id_gen.get_positions(), {"first": 3, "second": 7}
+                    first_id_gen.get_positions(), {"first": 7, "second": 7}
                 )
-                self.assertEqual(first_id_gen.get_persisted_upto_position(), 7)
 
         self.get_success(_get_next_async())
 
@@ -476,7 +473,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
 
         id_gen = self._create_id_generator("first", writers=["first", "second"])
 
-        self.assertEqual(id_gen.get_positions(), {"first": 3, "second": 5})
+        self.assertEqual(id_gen.get_positions(), {"first": 5, "second": 5})
 
         self.assertEqual(id_gen.get_persisted_upto_position(), 5)
 
@@ -632,7 +629,6 @@ class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
             return MultiWriterIdGenerator(
                 conn,
                 self.db_pool,
-                notifier=self.hs.get_replication_notifier(),
                 stream_name="test_stream",
                 instance_name=instance_name,
                 tables=[("foobar", "instance_name", "stream_id")],
@@ -724,7 +720,7 @@ class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
 
         self.get_success(_get_next_async2())
 
-        self.assertEqual(id_gen_1.get_positions(), {"first": -1, "second": -2})
+        self.assertEqual(id_gen_1.get_positions(), {"first": -2, "second": -2})
         self.assertEqual(id_gen_2.get_positions(), {"first": -1, "second": -2})
         self.assertEqual(id_gen_1.get_persisted_upto_position(), -2)
         self.assertEqual(id_gen_2.get_persisted_upto_position(), -2)
@@ -769,7 +765,6 @@ class MultiTableMultiWriterIdGeneratorTestCase(HomeserverTestCase):
             return MultiWriterIdGenerator(
                 conn,
                 self.db_pool,
-                notifier=self.hs.get_replication_notifier(),
                 stream_name="test_stream",
                 instance_name=instance_name,
                 tables=[
@@ -821,12 +816,15 @@ class MultiTableMultiWriterIdGeneratorTestCase(HomeserverTestCase):
         first_id_gen = self._create_id_generator("first", writers=["first", "second"])
         second_id_gen = self._create_id_generator("second", writers=["first", "second"])
 
-        self.assertEqual(first_id_gen.get_positions(), {"first": 3, "second": 6})
-        self.assertEqual(first_id_gen.get_current_token_for_writer("first"), 3)
+        # The first ID gen will notice that it can advance its token to 7 as it
+        # has no in progress writes...
+        self.assertEqual(first_id_gen.get_positions(), {"first": 7, "second": 6})
+        self.assertEqual(first_id_gen.get_current_token_for_writer("first"), 7)
         self.assertEqual(first_id_gen.get_current_token_for_writer("second"), 6)
         self.assertEqual(first_id_gen.get_persisted_upto_position(), 7)
 
+        # ... but the second ID gen doesn't know that.
         self.assertEqual(second_id_gen.get_positions(), {"first": 3, "second": 7})
         self.assertEqual(second_id_gen.get_current_token_for_writer("first"), 3)
         self.assertEqual(second_id_gen.get_current_token_for_writer("second"), 7)
-        self.assertEqual(second_id_gen.get_persisted_upto_position(), 7)
+        self.assertEqual(first_id_gen.get_persisted_upto_position(), 7)

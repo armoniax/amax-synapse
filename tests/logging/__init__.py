@@ -13,11 +13,9 @@
 # limitations under the License.
 import logging
 
-from tests.unittest import TestCase
 
-
-class LoggerCleanupMixin(TestCase):
-    def get_logger(self, handler: logging.Handler) -> logging.Logger:
+class LoggerCleanupMixin:
+    def get_logger(self, handler):
         """
         Attach a handler to a logger and add clean-ups to remove revert this.
         """

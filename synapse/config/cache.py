@@ -16,7 +16,7 @@ import logging
 import os
 import re
 import threading
-from typing import Any, Callable, Dict, Mapping, Optional
+from typing import Any, Callable, Dict, Optional
 
 import attr
 
@@ -94,7 +94,7 @@ def add_resizable_cache(
 
 class CacheConfig(Config):
     section = "caches"
-    _environ: Mapping[str, str] = os.environ
+    _environ = os.environ
 
     event_cache_size: int
     cache_factors: Dict[str, float]
@@ -126,7 +126,7 @@ class CacheConfig(Config):
 
         cache_config = config.get("caches") or {}
         self.global_factor = cache_config.get("global_factor", _DEFAULT_FACTOR_SIZE)
-        if type(self.global_factor) not in (int, float):
+        if not isinstance(self.global_factor, (int, float)):
             raise ConfigError("caches.global_factor must be a number.")
 
         # Load cache factors from the config
@@ -151,7 +151,7 @@ class CacheConfig(Config):
         )
 
         for cache, factor in individual_factors.items():
-            if type(factor) not in (int, float):
+            if not isinstance(factor, (int, float)):
                 raise ConfigError(
                     "caches.per_cache_factors.%s must be a number" % (cache,)
                 )

@@ -13,12 +13,10 @@
 #  limitations under the License.
 
 from io import BytesIO
-from typing import Tuple, Union
 from unittest.mock import Mock
 
 from netaddr import IPSet
 
-from twisted.internet.defer import Deferred
 from twisted.internet.error import DNSLookupError
 from twisted.python.failure import Failure
 from twisted.test.proto_helpers import AccumulatingProtocol
@@ -30,7 +28,6 @@ from synapse.http.client import (
     BlacklistingAgentWrapper,
     BlacklistingReactorWrapper,
     BodyExceededMaxSize,
-    _DiscardBodyWithMaxSizeProtocol,
     read_body_with_max_size,
 )
 
@@ -39,9 +36,7 @@ from tests.unittest import TestCase
 
 
 class ReadBodyWithMaxSizeTests(TestCase):
-    def _build_response(
-        self, length: Union[int, str] = UNKNOWN_LENGTH
-    ) -> Tuple[BytesIO, "Deferred[int]", _DiscardBodyWithMaxSizeProtocol]:
+    def _build_response(self, length=UNKNOWN_LENGTH):
         """Start reading the body, returns the response, result and proto"""
         response = Mock(length=length)
         result = BytesIO()
@@ -53,27 +48,23 @@ class ReadBodyWithMaxSizeTests(TestCase):
 
         return result, deferred, protocol
 
-    def _assert_error(
-        self, deferred: "Deferred[int]", protocol: _DiscardBodyWithMaxSizeProtocol
-    ) -> None:
+    def _assert_error(self, deferred, protocol):
         """Ensure that the expected error is received."""
-        assert isinstance(deferred.result, Failure)
+        self.assertIsInstance(deferred.result, Failure)
         self.assertIsInstance(deferred.result.value, BodyExceededMaxSize)
-        assert protocol.transport is not None
-        # type-ignore: presumably abortConnection has been replaced with a Mock.
-        protocol.transport.abortConnection.assert_called_once()  # type: ignore[attr-defined]
+        protocol.transport.abortConnection.assert_called_once()
 
-    def _cleanup_error(self, deferred: "Deferred[int]") -> None:
+    def _cleanup_error(self, deferred):
         """Ensure that the error in the Deferred is handled gracefully."""
         called = [False]
 
-        def errback(f: Failure) -> None:
+        def errback(f):
             called[0] = True
 
         deferred.addErrback(errback)
         self.assertTrue(called[0])
 
-    def test_no_error(self) -> None:
+    def test_no_error(self):
         """A response that is NOT too large."""
         result, deferred, protocol = self._build_response()
 
@@ -85,7 +76,7 @@ class ReadBodyWithMaxSizeTests(TestCase):
         self.assertEqual(result.getvalue(), b"12345")
         self.assertEqual(deferred.result, 5)
 
-    def test_too_large(self) -> None:
+    def test_too_large(self):
         """A response which is too large raises an exception."""
         result, deferred, protocol = self._build_response()
 
@@ -96,7 +87,7 @@ class ReadBodyWithMaxSizeTests(TestCase):
         self._assert_error(deferred, protocol)
         self._cleanup_error(deferred)
 
-    def test_multiple_packets(self) -> None:
+    def test_multiple_packets(self):
         """Data should be accumulated through mutliple packets."""
         result, deferred, protocol = self._build_response()
 
@@ -109,7 +100,7 @@ class ReadBodyWithMaxSizeTests(TestCase):
         self.assertEqual(result.getvalue(), b"1234")
         self.assertEqual(deferred.result, 4)
 
-    def test_additional_data(self) -> None:
+    def test_additional_data(self):
         """A connection can receive data after being closed."""
         result, deferred, protocol = self._build_response()
 
@@ -124,7 +115,7 @@ class ReadBodyWithMaxSizeTests(TestCase):
         self._assert_error(deferred, protocol)
         self._cleanup_error(deferred)
 
-    def test_content_length(self) -> None:
+    def test_content_length(self):
         """The body shouldn't be read (at all) if the Content-Length header is too large."""
         result, deferred, protocol = self._build_response(length=10)
 
@@ -141,7 +132,7 @@ class ReadBodyWithMaxSizeTests(TestCase):
 
 
 class BlacklistingAgentTest(TestCase):
-    def setUp(self) -> None:
+    def setUp(self):
         self.reactor, self.clock = get_clock()
 
         self.safe_domain, self.safe_ip = b"safe.test", b"1.2.3.4"
@@ -160,7 +151,7 @@ class BlacklistingAgentTest(TestCase):
         self.ip_whitelist = IPSet([self.allowed_ip.decode()])
         self.ip_blacklist = IPSet(["5.0.0.0/8"])
 
-    def test_reactor(self) -> None:
+    def test_reactor(self):
         """Apply the blacklisting reactor and ensure it properly blocks connections to particular domains and IPs."""
         agent = Agent(
             BlacklistingReactorWrapper(
@@ -206,7 +197,7 @@ class BlacklistingAgentTest(TestCase):
             response = self.successResultOf(d)
             self.assertEqual(response.code, 200)
 
-    def test_agent(self) -> None:
+    def test_agent(self):
         """Apply the blacklisting agent and ensure it properly blocks connections to particular IPs."""
         agent = BlacklistingAgentWrapper(
             Agent(self.reactor),

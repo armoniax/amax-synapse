@@ -21,12 +21,12 @@ from tests.unittest import TestCase
 
 
 class ParseCommandTestCase(TestCase):
-    def test_parse_one_word_command(self) -> None:
+    def test_parse_one_word_command(self):
         line = "REPLICATE"
         cmd = parse_command_from_line(line)
         self.assertIsInstance(cmd, ReplicateCommand)
 
-    def test_parse_rdata(self) -> None:
+    def test_parse_rdata(self):
         line = 'RDATA events master 6287863 ["ev", ["$eventid", "!roomid", "type", null, null, null]]'
         cmd = parse_command_from_line(line)
         assert isinstance(cmd, RdataCommand)
@@ -34,7 +34,7 @@ class ParseCommandTestCase(TestCase):
         self.assertEqual(cmd.instance_name, "master")
         self.assertEqual(cmd.token, 6287863)
 
-    def test_parse_rdata_batch(self) -> None:
+    def test_parse_rdata_batch(self):
         line = 'RDATA presence master batch ["@foo:example.com", "online"]'
         cmd = parse_command_from_line(line)
         assert isinstance(cmd, RdataCommand)

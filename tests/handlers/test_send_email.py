@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from typing import Callable, List, Tuple
+from typing import List, Tuple
 
 from zope.interface import implementer
 
@@ -28,27 +28,20 @@ from tests.unittest import HomeserverTestCase, override_config
 
 @implementer(interfaces.IMessageDelivery)
 class _DummyMessageDelivery:
-    def __init__(self) -> None:
+    def __init__(self):
         # (recipient, message) tuples
         self.messages: List[Tuple[smtp.Address, bytes]] = []
 
-    def receivedHeader(
-        self,
-        helo: Tuple[bytes, bytes],
-        origin: smtp.Address,
-        recipients: List[smtp.User],
-    ) -> None:
+    def receivedHeader(self, helo, origin, recipients):
         return None
 
-    def validateFrom(
-        self, helo: Tuple[bytes, bytes], origin: smtp.Address
-    ) -> smtp.Address:
+    def validateFrom(self, helo, origin):
         return origin
 
-    def record_message(self, recipient: smtp.Address, message: bytes) -> None:
+    def record_message(self, recipient: smtp.Address, message: bytes):
         self.messages.append((recipient, message))
 
-    def validateTo(self, user: smtp.User) -> Callable[[], interfaces.IMessageSMTP]:
+    def validateTo(self, user: smtp.User):
         return lambda: _DummyMessage(self, user)
 
 
@@ -63,20 +56,20 @@ class _DummyMessage:
         self._user = user
         self._buffer: List[bytes] = []
 
-    def lineReceived(self, line: bytes) -> None:
+    def lineReceived(self, line):
         self._buffer.append(line)
 
-    def eomReceived(self) -> "defer.Deferred[bytes]":
+    def eomReceived(self):
         message = b"\n".join(self._buffer) + b"\n"
         self._delivery.record_message(self._user.dest, message)
         return defer.succeed(b"saved")
 
-    def connectionLost(self) -> None:
+    def connectionLost(self):
         pass
 
 
 class SendEmailHandlerTestCase(HomeserverTestCase):
-    def test_send_email(self) -> None:
+    def test_send_email(self):
         """Happy-path test that we can send email to a non-TLS server."""
         h = self.hs.get_send_email_handler()
         d = ensureDeferred(
@@ -126,7 +119,7 @@ class SendEmailHandlerTestCase(HomeserverTestCase):
             },
         }
     )
-    def test_send_email_force_tls(self) -> None:
+    def test_send_email_force_tls(self):
         """Happy-path test that we can send email to an Implicit TLS server."""
         h = self.hs.get_send_email_handler()
         d = ensureDeferred(

@@ -18,7 +18,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Collection,
     Dict,
     Generator,
     Iterable,
@@ -127,7 +126,7 @@ from synapse.types import (
 from synapse.types.state import StateFilter
 from synapse.util import Clock
 from synapse.util.async_helpers import maybe_awaitable
-from synapse.util.caches.descriptors import CachedFunction, cached as _cached
+from synapse.util.caches.descriptors import CachedFunction, cached
 from synapse.util.frozenutils import freeze
 
 if TYPE_CHECKING:
@@ -137,7 +136,6 @@ if TYPE_CHECKING:
 
 T = TypeVar("T")
 P = ParamSpec("P")
-F = TypeVar("F", bound=Callable[..., Any])
 
 """
 This package defines the 'stable' API which can be used by extension modules which
@@ -185,42 +183,6 @@ class UserIpAndAgent:
     user_agent: str
     # The time at which this user agent/ip was last seen.
     last_seen: int
-
-
-def cached(
-    *,
-    max_entries: int = 1000,
-    num_args: Optional[int] = None,
-    uncached_args: Optional[Collection[str]] = None,
-) -> Callable[[F], CachedFunction[F]]:
-    """Returns a decorator that applies a memoizing cache around the function. This
-    decorator behaves similarly to functools.lru_cache.
-
-    Example:
-
-        @cached()
-        def foo('a', 'b'):
-            ...
-
-    Added in Synapse v1.74.0.
-
-    Args:
-        max_entries: The maximum number of entries in the cache. If the cache is full
-            and a new entry is added, the least recently accessed entry will be evicted
-            from the cache.
-        num_args: The number of positional arguments (excluding `self`) to use as cache
-            keys. Defaults to all named args of the function.
-        uncached_args: A list of argument names to not use as the cache key. (`self` is
-            always ignored.) Cannot be used with num_args.
-
-    Returns:
-        A decorator that applies a memoizing cache around the function.
-    """
-    return _cached(
-        max_entries=max_entries,
-        num_args=num_args,
-        uncached_args=uncached_args,
-    )
 
 
 class ModuleApi:
@@ -1158,7 +1120,7 @@ class ModuleApi:
             # Send to remote destinations.
             destination = UserID.from_string(user).domain
             presence_handler.get_federation_queue().send_presence_to_destinations(
-                presence_events, [destination]
+                presence_events, destination
             )
 
     def looping_background_call(
@@ -1584,33 +1546,6 @@ class ModuleApi:
         )
 
         return room_id_and_alias["room_id"], room_id_and_alias.get("room_alias", None)
-
-    async def set_displayname(
-        self,
-        user_id: UserID,
-        new_displayname: str,
-        deactivation: bool = False,
-    ) -> None:
-        """Sets a user's display name.
-
-        Added in Synapse v1.76.0.
-
-        Args:
-            user_id:
-                The user whose display name is to be changed.
-            new_displayname:
-                The new display name to give the user.
-            deactivation:
-                Whether this change was made while deactivating the user.
-        """
-        requester = create_requester(user_id)
-        await self._hs.get_profile_handler().set_displayname(
-            target_user=user_id,
-            requester=requester,
-            new_displayname=new_displayname,
-            by_admin=True,
-            deactivation=deactivation,
-        )
 
 
 class PublicRoomListManager:

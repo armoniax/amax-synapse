@@ -14,16 +14,12 @@
 import logging
 from typing import Tuple
 
-from twisted.test.proto_helpers import MemoryReactor
-
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.rest import admin
 from synapse.rest.client import login, room
-from synapse.server import HomeServer
 from synapse.types import create_requester
-from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
 from tests import unittest
@@ -39,7 +35,7 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
         room.register_servlets,
     ]
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+    def prepare(self, reactor, clock, hs):
         self.handler = self.hs.get_event_creation_handler()
         self._persist_event_storage_controller = (
             self.hs.get_storage_controllers().persistence
@@ -98,7 +94,7 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
             )
         )
 
-    def test_duplicated_txn_id(self) -> None:
+    def test_duplicated_txn_id(self):
         """Test that attempting to handle/persist an event with a transaction ID
         that has already been persisted correctly returns the old event and does
         *not* produce duplicate messages.
@@ -165,7 +161,7 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
         # rather than the new one.
         self.assertEqual(ret_event1.event_id, ret_event4.event_id)
 
-    def test_duplicated_txn_id_one_call(self) -> None:
+    def test_duplicated_txn_id_one_call(self):
         """Test that we correctly handle duplicates that we try and persist at
         the same time.
         """
@@ -189,9 +185,7 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(events), 2)
         self.assertEqual(events[0].event_id, events[1].event_id)
 
-    def test_when_empty_prev_events_allowed_create_event_with_empty_prev_events(
-        self,
-    ) -> None:
+    def test_when_empty_prev_events_allowed_create_event_with_empty_prev_events(self):
         """When we set allow_no_prev_events=True, should be able to create a
         event without any prev_events (only auth_events).
         """
@@ -220,7 +214,7 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
 
     def test_when_empty_prev_events_not_allowed_reject_event_with_empty_prev_events(
         self,
-    ) -> None:
+    ):
         """When we set allow_no_prev_events=False, shouldn't be able to create a
         event without any prev_events even if it has auth_events. Expect an
         exception to be raised.
@@ -251,7 +245,7 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
 
     def test_when_empty_prev_events_allowed_reject_event_with_empty_prev_events_and_auth_events(
         self,
-    ) -> None:
+    ):
         """When we set allow_no_prev_events=True, should be able to create a
         event without any prev_events or auth_events. Expect an exception to be
         raised.
@@ -283,12 +277,12 @@ class ServerAclValidationTestCase(unittest.HomeserverTestCase):
         room.register_servlets,
     ]
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+    def prepare(self, reactor, clock, hs):
         self.user_id = self.register_user("tester", "foobar")
         self.access_token = self.login("tester", "foobar")
         self.room_id = self.helper.create_room_as(self.user_id, tok=self.access_token)
 
-    def test_allow_server_acl(self) -> None:
+    def test_allow_server_acl(self):
         """Test that sending an ACL that blocks everyone but ourselves works."""
 
         self.helper.send_state(
@@ -299,7 +293,7 @@ class ServerAclValidationTestCase(unittest.HomeserverTestCase):
             expect_code=200,
         )
 
-    def test_deny_server_acl_block_outselves(self) -> None:
+    def test_deny_server_acl_block_outselves(self):
         """Test that sending an ACL that blocks ourselves does not work."""
         self.helper.send_state(
             self.room_id,
@@ -309,7 +303,7 @@ class ServerAclValidationTestCase(unittest.HomeserverTestCase):
             expect_code=400,
         )
 
-    def test_deny_redact_server_acl(self) -> None:
+    def test_deny_redact_server_acl(self):
         """Test that attempting to redact an ACL is blocked."""
 
         body = self.helper.send_state(

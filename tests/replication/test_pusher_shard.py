@@ -15,12 +15,9 @@ import logging
 from unittest.mock import Mock
 
 from twisted.internet import defer
-from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.rest import admin
 from synapse.rest.client import login, room
-from synapse.server import HomeServer
-from synapse.util import Clock
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
 
@@ -36,12 +33,12 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+    def prepare(self, reactor, clock, hs):
         # Register a user who sends a message that we'll get notified about
         self.other_user_id = self.register_user("otheruser", "pass")
         self.other_access_token = self.login("otheruser", "pass")
 
-    def _create_pusher_and_send_msg(self, localpart: str) -> str:
+    def _create_pusher_and_send_msg(self, localpart):
         # Create a user that will get push notifications
         user_id = self.register_user(localpart, "pass")
         access_token = self.login(localpart, "pass")
@@ -82,7 +79,7 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
 
         return event_id
 
-    def test_send_push_single_worker(self) -> None:
+    def test_send_push_single_worker(self):
         """Test that registration works when using a pusher worker."""
         http_client_mock = Mock(spec_set=["post_json_get_json"])
         http_client_mock.post_json_get_json.side_effect = (
@@ -112,7 +109,7 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
             ],
         )
 
-    def test_send_push_multiple_workers(self) -> None:
+    def test_send_push_multiple_workers(self):
         """Test that registration works when using sharded pusher workers."""
         http_client_mock1 = Mock(spec_set=["post_json_get_json"])
         http_client_mock1.post_json_get_json.side_effect = (
