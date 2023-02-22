@@ -977,12 +977,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             return 200, {}
 
         target = requester.user
-        if content["user_ids"] is None and membership_action == "kick":
-            if isinstance(content["user_ids"], [str]):
-                raise SynapseError(400, "user_ids type is invalid", Codes.BAD_JSON)
-           targets =  [UserID.from_string(user) for user in list(content["user_ids"])]
-
-        if targets is None and membership_action in ["invite", "ban", "unban", "kick"]:
+        if membership_action in ["invite", "ban", "unban", "kick"]:
             assert_params_in_dict(content, ["user_id"])
             target = UserID.from_string(content["user_id"])
 
