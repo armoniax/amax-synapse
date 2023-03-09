@@ -1910,37 +1910,14 @@ class AuthHandler:
             Whether self.hash(password) == stored_hash.
         """
 
-        # def _do_validate_hash(checked_hash: bytes) -> bool:
-        #     # Normalise the Unicode in the password
-        #     pw = unicodedata.normalize("NFKC", password)
-        #
-        #     return bcrypt.checkpw(
-        #         pw.encode("utf8") + self.hs.config.auth.password_pepper.encode("utf8"),
-        #         checked_hash,
-        #     )
         def _do_validate_hash(checked_hash: bytes) -> bool:
             # Normalise the Unicode in the password
-            _passwrod = password
-            _check_hash = checked_hash
+            pw = unicodedata.normalize("NFKC", password)
 
-            if not isinstance(_passwrod, str):
-                _check_hash = _passwrod.decode("utf-8")
-            if not isinstance(_check_hash, str):
-                _check_hash = _check_hash.decode("utf-8")
-
-            def _do_hash(pwd: str, pwd_hash: bytes) -> bool:
-                pw = unicodedata.normalize("NFKC", pwd)
-
-                return bcrypt.checkpw(
-                    pw.encode("utf8") + self.hs.config.auth.password_pepper.encode(
-                        "utf8"),
-                    pwd_hash,
-                )
-
-            r = _do_hash(_passwrod, _check_hash.encode("utf-8"))
-            if not r:
-                r = _do_hash(_check_hash, _passwrod.encode("utf-8"))
-            return r
+            return bcrypt.checkpw(
+                pw.encode("utf8") + self.hs.config.auth.password_pepper.encode("utf8"),
+                checked_hash,
+            )
 
         if stored_hash:
             if not isinstance(stored_hash, bytes):
