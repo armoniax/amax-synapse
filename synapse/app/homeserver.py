@@ -96,6 +96,9 @@ class SynapseHomeServer(HomeServer):
                     # Skip loading openid resource if federation is defined
                     # since federation resource will include openid
                     continue
+                if name == "health":
+                    # Skip loading, health resource is always included
+                    continue
                 resources.update(self._configure_named_resource(name, res.compress))
 
         additional_resources = listener_config.http_options.additional_resources
@@ -318,7 +321,6 @@ def setup(config_options: List[str]) -> SynapseHomeServer:
             and not config.registration.registrations_require_3pid
             and not config.registration.registration_requires_token
         ):
-
             raise ConfigError(
                 "You have enabled open registration without any verification. This is a known vector for "
                 "spam and abuse. If you would like to allow public registration, please consider adding email, "

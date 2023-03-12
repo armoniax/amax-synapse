@@ -91,6 +91,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 MultiWriterIdGenerator(
                     db_conn=db_conn,
                     db=database,
+                    notifier=hs.get_replication_notifier(),
                     stream_name="to_device",
                     instance_name=self._instance_name,
                     tables=[("device_inbox", "instance_name", "stream_id")],
@@ -101,7 +102,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         else:
             self._can_write_to_device = True
             self._device_inbox_id_gen = StreamIdGenerator(
-                db_conn, "device_inbox", "stream_id"
+                db_conn, hs.get_replication_notifier(), "device_inbox", "stream_id"
             )
 
         max_device_inbox_id = self._device_inbox_id_gen.get_current_token()
@@ -156,6 +157,13 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                         row.entity, token
                     )
         return super().process_replication_rows(stream_name, instance_name, token, rows)
+
+    def process_replication_position(
+        self, stream_name: str, instance_name: str, token: int
+    ) -> None:
+        if stream_name == ToDeviceStream.NAME:
+            self._device_inbox_id_gen.advance(instance_name, token)
+        super().process_replication_position(stream_name, instance_name, token)
 
     def get_to_device_stream_token(self) -> int:
         return self._device_inbox_id_gen.get_current_token()
@@ -713,8 +721,8 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                         ],
                     )
 
-                for (user_id, messages_by_device) in edu["messages"].items():
-                    for (device_id, msg) in messages_by_device.items():
+                for user_id, messages_by_device in edu["messages"].items():
+                    for device_id, msg in messages_by_device.items():
                         with start_active_span("store_outgoing_to_device_message"):
                             set_tag(SynapseTags.TO_DEVICE_EDU_ID, edu["sender"])
                             set_tag(SynapseTags.TO_DEVICE_EDU_ID, edu["message_id"])
@@ -951,7 +959,6 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
         def _remove_dead_devices_from_device_inbox_txn(
             txn: LoggingTransaction,
         ) -> Tuple[int, bool]:
-
             if "max_stream_id" in progress:
                 max_stream_id = progress["max_stream_id"]
             else:
