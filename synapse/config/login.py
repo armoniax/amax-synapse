@@ -11,7 +11,7 @@ class LoginConfig(Config):
     section = "login"
 
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
-        #   amax_login:
+        #   amax:
         #       chain_id: 208dacab3cd2e181c86841613cf05d9c60786c677e4ce86b266d0a58884968f7
         #       signature_url: http://storage.ambt.art/api/v1/signature_verify
         amax_login = config.get("amax", None)

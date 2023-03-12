@@ -57,7 +57,6 @@ from .workers import WorkerConfig
 
 
 class HomeServerConfig(RootConfig):
-
     config_classes = [
         ModulesConfig,
         ServerConfig,
