@@ -203,9 +203,16 @@ class RoomNotifCounts:
     # Map of thread ID to the notification counts.
     threads: Dict[str, NotifCounts]
 
+    @staticmethod
+    def empty() -> "RoomNotifCounts":
+        return _EMPTY_ROOM_NOTIF_COUNTS
+
     def __len__(self) -> int:
         # To properly account for the amount of space in any caches.
         return len(self.threads) + 1
+
+
+_EMPTY_ROOM_NOTIF_COUNTS = RoomNotifCounts(NotifCounts(), {})
 
 
 def _serialize_action(
@@ -273,15 +280,6 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             self._clear_old_staging_loop = self._clock.looping_call(
                 self._clear_old_push_actions_staging, 30 * 60 * 1000
             )
-
-        self.db_pool.updates.register_background_index_update(
-            "event_push_summary_unique_index",
-            index_name="event_push_summary_unique_index",
-            table="event_push_summary",
-            columns=["user_id", "room_id"],
-            unique=True,
-            replaces_index="event_push_summary_user_rm",
-        )
 
         self.db_pool.updates.register_background_index_update(
             "event_push_summary_unique_index2",

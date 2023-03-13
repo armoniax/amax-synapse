@@ -40,6 +40,38 @@ target-version = ['py37', 'py38', 'py39', 'py310']
 # https://black.readthedocs.io/en/stable/usage_and_configuration/file_collection_and_discovery.html#gitignore
 # Use `extend-exclude` if you want to exclude something in addition to this.
 
+[tool.ruff]
+line-length = 88
+
+# See https://github.com/charliermarsh/ruff/#pycodestyle
+# for error codes. The ones we ignore are:
+#  E731: do not assign a lambda expression, use a def
+#  E501: Line too long (black enforces this for us)
+#
+# flake8-bugbear compatible checks. Its error codes are described at
+# https://github.com/charliermarsh/ruff/#flake8-bugbear
+#  B019: Use of functools.lru_cache or functools.cache on methods can lead to memory leaks
+#  B023: Functions defined inside a loop must not use variables redefined in the loop
+#  B024: Abstract base class with no abstract method.
+ignore = [
+    "B019",
+    "B023",
+    "B024",
+    "E501",
+    "E731",
+]
+select = [
+    # pycodestyle checks.
+    "E",
+    "W",
+    # pyflakes checks.
+    "F",
+    # flake8-bugbear checks.
+    "B0",
+    # flake8-comprehensions checks.
+    "C4",
+]
+
 [tool.isort]
 line_length = 88
 sections = ["FUTURE", "STDLIB", "THIRDPARTY", "TWISTED", "FIRSTPARTY", "TESTS", "LOCALFOLDER"]
@@ -57,7 +89,7 @@ manifest-path = "rust/Cargo.toml"
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.74.0"
+version = "1.79.0rc1"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -95,7 +127,9 @@ exclude = [
     { path = "synapse/*.so", format = "sdist"}
 ]
 
-build = "build_rust.py"
+[tool.poetry.build]
+script = "build_rust.py"
+generate-setup-file = true
 
 [tool.poetry.scripts]
 synapse_homeserver = "synapse.app.homeserver:main"
@@ -120,7 +154,9 @@ python = "^3.7.1"
 # we use the TYPE_CHECKER.redefine method added in jsonschema 3.0.0
 jsonschema = ">=3.0.0"
 # frozendict 2.1.2 is broken on Debian 10: https://github.com/Marco-Sulla/python-frozendict/issues/41
-frozendict = ">=1,!=2.1.2"
+# We cannot test our wheels against the 2.3.5 release in CI. Putting in an upper bound for this
+# because frozendict has been more trouble than it's worth; we would like to move to immutabledict.
+frozendict = ">=1,!=2.1.2,<2.3.5"
 # We require 2.1.0 or higher for type hints. Previous guard was >= 1.1.0
 unpaddedbase64 = ">=2.1.0"
 # We require 1.5.0 to work around an issue when running against the C implementation of
@@ -136,7 +172,7 @@ Twisted = {extras = ["tls"], version = ">=18.9.0"}
 treq = ">=15.1"
 # Twisted has required pyopenssl 16.0 since about Twisted 16.6.
 pyOpenSSL = ">=16.0.0"
-PyYAML = ">=3.11"
+PyYAML = ">=3.13"
 pyasn1 = ">=0.1.9"
 pyasn1-modules = ">=0.0.7"
 bcrypt = ">=3.1.7"
@@ -213,7 +249,6 @@ by = "^0.0.2"
 base58 = "^2.1.1"
 pyicu = { version = ">=2.10.2", optional = true }
 eospy = "^0.0.2"
-sha256 = "^0.3"
 requests = "2.27.1"
 
 [tool.poetry.extras]
@@ -280,12 +315,10 @@ all = [
 ]
 
 [tool.poetry.dev-dependencies]
-## We pin black so that our tests don't start failing on new releases.
+# We pin black so that our tests don't start failing on new releases.
 isort = ">=5.10.1"
 black = ">=22.3.0"
-flake8-comprehensions = "*"
-flake8-bugbear = ">=21.3.2"
-flake8 = "*"
+ruff = "0.0.252"
 
 # Typechecking
 mypy = "*"
@@ -320,13 +353,16 @@ twine = "*"
 # Towncrier min version comes from #3425. Rationale unclear.
 towncrier = ">=18.6.0rc1"
 
+# Used for checking the Poetry lockfile
+tomli = ">=1.2.3"
+
 [build-system]
 # The upper bounds here are defensive, intended to prevent situations like
 # #13849 and #14079 where we see buildtime or runtime errors caused by build
 # system changes.
 # We are happy to raise these upper bounds upon request,
 # provided we check that it's safe to do so (i.e. that CI passes).
-requires = ["poetry-core>=1.0.0,<=1.3.2", "setuptools_rust>=1.3,<=1.5.2"]
+requires = ["poetry-core>=1.0.0,<=1.5.0", "setuptools_rust>=1.3,<=1.5.2"]
 build-backend = "poetry.core.masonry.api"
 
 

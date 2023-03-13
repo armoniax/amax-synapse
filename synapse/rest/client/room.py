@@ -26,7 +26,7 @@ from prometheus_client.core import Histogram
 from twisted.web.server import Request
 
 from synapse import event_auth
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import Direction, EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -37,13 +37,14 @@ from synapse.api.errors import (
     UnredactedContentDeletedError,
 )
 from synapse.api.filtering import Filter
-from synapse.events.utils import format_event_for_client_v2
+from synapse.events.utils import SerializeEventConfig, format_event_for_client_v2
 from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     ResolveRoomIdMixin,
     RestServlet,
     assert_params_in_dict,
     parse_boolean,
+    parse_enum,
     parse_integer,
     parse_json_object_from_request,
     parse_string,
@@ -159,11 +160,11 @@ class RoomCreateRestServlet(TransactionRestServlet):
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
-        info, _ = await self._room_creation_handler.create_room(
+        room_id, _, _ = await self._room_creation_handler.create_room(
             requester, self.get_room_config(request)
         )
 
-        return 200, info
+        return 200, {"room_id": room_id}
 
     def get_room_config(self, request: Request) -> JsonDict:
         user_supplied_config = parse_json_object_from_request(request)
@@ -813,11 +814,13 @@ class RoomEventServlet(RestServlet):
                 [event], requester.user.to_string()
             )
 
-            time_now = self.clock.time_msec()
             # per MSC2676, /rooms/{roomId}/event/{eventId}, should return the
             # *original* event, rather than the edited version
             event_dict = self._event_serializer.serialize_event(
-                event, time_now, bundle_aggregations=aggregations, apply_edits=False
+                event,
+                self.clock.time_msec(),
+                bundle_aggregations=aggregations,
+                config=SerializeEventConfig(requester=requester),
             )
             return 200, event_dict
 
@@ -862,24 +865,30 @@ class RoomEventContextServlet(RestServlet):
             raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
 
         time_now = self.clock.time_msec()
+        serializer_options = SerializeEventConfig(requester=requester)
         results = {
             "events_before": self._event_serializer.serialize_events(
                 event_context.events_before,
                 time_now,
                 bundle_aggregations=event_context.aggregations,
+                config=serializer_options,
             ),
             "event": self._event_serializer.serialize_event(
                 event_context.event,
                 time_now,
                 bundle_aggregations=event_context.aggregations,
+                config=serializer_options,
             ),
             "events_after": self._event_serializer.serialize_events(
                 event_context.events_after,
                 time_now,
                 bundle_aggregations=event_context.aggregations,
+                config=serializer_options,
             ),
             "state": self._event_serializer.serialize_events(
-                event_context.state, time_now
+                event_context.state,
+                time_now,
+                config=serializer_options,
             ),
             "start": event_context.start,
             "end": event_context.end,
@@ -925,7 +934,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         self.auth = hs.get_auth()
 
     def register(self, http_server: HttpServer) -> None:
-        # /rooms/$roomid/[invite|join|leave]
+        # /rooms/$roomid/[join|invite|leave|ban|unban|kick]
         PATTERNS = (
             "/rooms/(?P<room_id>[^/]*)/"
             "(?P<membership_action>join|invite|leave|ban|unban|kick)"
@@ -975,17 +984,26 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 pass
             return 200, {}
 
-        target = requester.user
-        if membership_action in ["invite", "ban", "unban", "kick"]:
+        targets = None
+        if content["user_ids"] is not None and membership_action == "kick":
+            if not isinstance(content["user_ids"], [str]):
+                raise SynapseError(400, "user_ids type is invalid", Codes.BAD_JSON)
+            targets = [UserID.from_string(userId) for userId in
+                       list(content["user_ids"])]
+
+        elif membership_action in ["invite", "ban", "unban", "kick"]:
             assert_params_in_dict(content, ["user_id"])
-            target = UserID.from_string(content["user_id"])
+            targets = [UserID.from_string(content["user_id"])]
+
+        if requester.user not in targets:
+            targets = [requester.user]
 
         event_content = None
         if "reason" in content:
             event_content = {"reason": content["reason"]}
 
         try:
-            await self.room_member_handler.update_membership(
+            [await self.room_member_handler.update_membership(
                 requester=requester,
                 target=target,
                 room_id=room_id,
@@ -993,7 +1011,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 txn_id=txn_id,
                 third_party_signed=content.get("third_party_signed", None),
                 content=event_content,
-            )
+            ) for target in targets]
         except ShadowBanError:
             # Pretend the request succeeded.
             pass
@@ -1154,11 +1172,12 @@ class RoomTypingRestServlet(RestServlet):
 
 class RoomAliasListServlet(RestServlet):
     PATTERNS = [
-        re.compile(
-            r"^/_matrix/client/unstable/org\.matrix\.msc2432"
-            r"/rooms/(?P<room_id>[^/]*)/aliases"
-        ),
-    ] + list(client_patterns("/rooms/(?P<room_id>[^/]*)/aliases$", unstable=False))
+                   re.compile(
+                       r"^/_matrix/client/unstable/org\.matrix\.msc2432"
+                       r"/rooms/(?P<room_id>[^/]*)/aliases"
+                   ),
+               ] + list(
+        client_patterns("/rooms/(?P<room_id>[^/]*)/aliases$", unstable=False))
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -1191,7 +1210,7 @@ class SearchRestServlet(RestServlet):
         content = parse_json_object_from_request(request)
 
         batch = parse_string(request, "next_batch")
-        results = await self.search_handler.search(requester.user, content, batch)
+        results = await self.search_handler.search(requester, content, batch)
 
         return 200, results
 
@@ -1297,7 +1316,7 @@ class TimestampLookupRestServlet(RestServlet):
         await self._auth.check_user_in_room_or_world_readable(room_id, requester)
 
         timestamp = parse_integer(request, "ts", required=True)
-        direction = parse_string(request, "dir", default="f", allowed_values=["f", "b"])
+        direction = parse_enum(request, "dir", Direction, default=Direction.FORWARDS)
 
         (
             event_id,
