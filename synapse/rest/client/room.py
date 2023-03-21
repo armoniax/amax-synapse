@@ -984,26 +984,17 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 pass
             return 200, {}
 
-        targets = None
-        if content["user_ids"] is not None and membership_action == "kick":
-            if not isinstance(content["user_ids"], [str]):
-                raise SynapseError(400, "user_ids type is invalid", Codes.BAD_JSON)
-            targets = [UserID.from_string(userId) for userId in
-                       list(content["user_ids"])]
-
-        elif membership_action in ["invite", "ban", "unban", "kick"]:
+        target = requester.user
+        if membership_action in ["invite", "ban", "unban", "kick"]:
             assert_params_in_dict(content, ["user_id"])
-            targets = [UserID.from_string(content["user_id"])]
-
-        if requester.user not in targets:
-            targets = [requester.user]
+            target = UserID.from_string(content["user_id"])
 
         event_content = None
         if "reason" in content:
             event_content = {"reason": content["reason"]}
 
         try:
-            [await self.room_member_handler.update_membership(
+            await self.room_member_handler.update_membership(
                 requester=requester,
                 target=target,
                 room_id=room_id,
@@ -1011,7 +1002,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 txn_id=txn_id,
                 third_party_signed=content.get("third_party_signed", None),
                 content=event_content,
-            ) for target in targets]
+            )
         except ShadowBanError:
             # Pretend the request succeeded.
             pass
@@ -1172,12 +1163,11 @@ class RoomTypingRestServlet(RestServlet):
 
 class RoomAliasListServlet(RestServlet):
     PATTERNS = [
-                   re.compile(
-                       r"^/_matrix/client/unstable/org\.matrix\.msc2432"
-                       r"/rooms/(?P<room_id>[^/]*)/aliases"
-                   ),
-               ] + list(
-        client_patterns("/rooms/(?P<room_id>[^/]*)/aliases$", unstable=False))
+        re.compile(
+            r"^/_matrix/client/unstable/org\.matrix\.msc2432"
+            r"/rooms/(?P<room_id>[^/]*)/aliases"
+        ),
+    ] + list(client_patterns("/rooms/(?P<room_id>[^/]*)/aliases$", unstable=False))
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
