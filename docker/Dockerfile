@@ -164,10 +164,10 @@ RUN \
   libicu67 \
   libssl-dev \
   openssl \
+  git \
   && rm -rf /var/lib/apt/lists/*
 
 RUN \
-    apt-get install git -y && \
     cd / && git clone https://github.com/matrix-org/synapse-bind-sydent.git && \
     cd /synapse-bind-sydent && \
     pip install --upgrade pip && \
