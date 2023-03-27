@@ -732,6 +732,7 @@ class SynapseCmd(cmd.Cmd):
         query_params = query_params or {"access_token": None}
 
         url = self._url() + path
+        print("_run_and_pprint, url: %s, " % url)
         if "access_token" in query_params:
             query_params["access_token"] = self._tok()
 

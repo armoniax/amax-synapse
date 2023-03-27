@@ -343,6 +343,7 @@ class RoomSendEventRestServlet(TransactionRestServlet):
             "sender": requester.user.to_string(),
         }
 
+        print("RoomSendEventRestServlet, on_POST, event_dict: %s" % (str(event_dict)))
         if requester.app_service:
             origin_server_ts = parse_integer(request, "ts")
             if origin_server_ts is not None:
@@ -370,6 +371,7 @@ class RoomSendEventRestServlet(TransactionRestServlet):
     def on_PUT(
         self, request: SynapseRequest, room_id: str, event_type: str, txn_id: str
     ) -> Awaitable[Tuple[int, JsonDict]]:
+        print("RoomSendEventRestServlet, on_PUT, room_id: %s" % room_id)
         set_tag("txn_id", txn_id)
 
         return self.txns.fetch_or_execute_request(

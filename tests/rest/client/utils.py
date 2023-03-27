@@ -34,17 +34,15 @@ from typing import (
 from urllib.parse import urlencode
 
 import attr
-from typing_extensions import Literal
-
 from twisted.test.proto_helpers import MemoryReactorClock
 from twisted.web.resource import Resource
 from twisted.web.server import Site
+from typing_extensions import Literal
 
 from synapse.api.constants import Membership
 from synapse.api.errors import Codes
 from synapse.server import HomeServer
 from synapse.types import JsonDict
-
 from tests.server import FakeChannel, FakeSite, make_request
 from tests.test_utils.html_parsers import TestHtmlParser
 from tests.test_utils.oidc import FakeAuthorizationGrant, FakeOidcServer
@@ -368,6 +366,7 @@ class RestHelper:
 
         content = {"msgtype": "m.text", "body": body}
 
+        print("utils.send, content: %s, room_id: %s, txn_id: %s " %(str(content), room_id, txn_id))
         return self.send_event(
             room_id,
             "m.room.message",
