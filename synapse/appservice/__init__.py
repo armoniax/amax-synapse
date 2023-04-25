@@ -360,7 +360,8 @@ class ApplicationService:
         ]
 
     def is_rate_limited(self) -> bool:
-        return self.rate_limited
+        return False
+        # return self.rate_limited
 
     def __str__(self) -> str:
         # copy dictionary and redact token fields so they don't get logged
