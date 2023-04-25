@@ -131,6 +131,7 @@ class Ratelimiter:
                 * The reactor timestamp for when the action can be performed next.
                   -1 if rate_hz is less than or equal to zero
         """
+        return True, -1
         key = self._get_key(requester, key)
 
         if requester:
