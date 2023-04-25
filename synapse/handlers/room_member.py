@@ -93,7 +93,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.event_auth_handler = hs.get_event_auth_handler()
 
         self.member_linearizer: Linearizer = Linearizer(name="member")
-        self.member_as_limiter = Linearizer(max_count=100, name="member_as_limiter")
+        self.member_as_limiter = Linearizer(max_count=10, name="member_as_limiter")
 
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
