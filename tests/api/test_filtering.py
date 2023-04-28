@@ -21,6 +21,8 @@ import jsonschema
 
 from twisted.test.proto_helpers import MemoryReactor
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.api.constants import EduTypes, EventContentFields
 from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter

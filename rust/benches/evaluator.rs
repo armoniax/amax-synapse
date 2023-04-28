@@ -52,6 +52,7 @@ fn bench_match_exact(b: &mut Bencher) {
         true,
         vec![],
         false,
+        false,
     )
     .unwrap();
 
@@ -96,6 +97,7 @@ fn bench_match_word(b: &mut Bencher) {
         Default::default(),
         true,
         vec![],
+        false,
         false,
     )
     .unwrap();
@@ -142,6 +144,7 @@ fn bench_match_word_miss(b: &mut Bencher) {
         true,
         vec![],
         false,
+        false,
     )
     .unwrap();
 
@@ -186,6 +189,7 @@ fn bench_eval_message(b: &mut Bencher) {
         Default::default(),
         true,
         vec![],
+        false,
         false,
     )
     .unwrap();

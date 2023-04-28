@@ -96,6 +96,9 @@ pub struct PushRuleEvaluator {
     /// If MSC3931 (room version feature flags) is enabled. Usually controlled by the same
     /// flag as MSC1767 (extensible events core).
     msc3931_enabled: bool,
+
+    /// If MSC3966 (exact_event_property_contains push rule condition) is enabled.
+    msc3966_exact_event_property_contains: bool,
 }
 
 #[pymethods]
@@ -113,6 +116,7 @@ impl PushRuleEvaluator {
         related_event_match_enabled: bool,
         room_version_feature_flags: Vec<String>,
         msc3931_enabled: bool,
+        msc3966_exact_event_property_contains: bool,
     ) -> Result<Self, Error> {
         let body = match flattened_keys.get("content.body") {
             Some(JsonValue::Value(SimpleJsonValue::Str(s))) => s.clone(),
@@ -130,6 +134,7 @@ impl PushRuleEvaluator {
             related_event_match_enabled,
             room_version_feature_flags,
             msc3931_enabled,
+            msc3966_exact_event_property_contains,
         })
     }
 
@@ -505,6 +510,7 @@ fn push_rule_evaluator() {
         true,
         vec![],
         true,
+        true,
     )
     .unwrap();
 
@@ -533,6 +539,7 @@ fn test_requires_room_version_supports_condition() {
         BTreeMap::new(),
         false,
         flags,
+        true,
         true,
     )
     .unwrap();
