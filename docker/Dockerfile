@@ -181,6 +181,16 @@ RUN \
   openssl \
   && rm -rf /var/lib/apt/lists/*
 
+RUN \
+    cd / && git clone https://github.com/matrix-org/synapse-bind-sydent.git && \
+    cd /synapse-bind-sydent && \
+    pip install --upgrade pip && \
+    pip install . && \
+    pip install -e "git+https://github.com/matrix-org/mjolnir.git#egg=mjolnir&subdirectory=synapse_antispam" && \
+    apt remove git -y && \
+    apt autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /install /usr/local
 COPY ./docker/start.py /start.py
 COPY ./docker/conf /conf
