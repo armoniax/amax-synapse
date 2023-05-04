@@ -179,6 +179,7 @@ RUN \
   libicu67 \
   libssl-dev \
   openssl \
+  git \
   && rm -rf /var/lib/apt/lists/*
 
 RUN \
