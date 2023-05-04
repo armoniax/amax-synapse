@@ -57,7 +57,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.client._base import client_patterns
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.streams.config import PaginationConfig
-from synapse.types import JsonDict, StreamToken, ThirdPartyInstanceID, UserID
+from synapse.types import JsonDict, Requester, StreamToken, ThirdPartyInstanceID, UserID
 from synapse.types.state import StateFilter
 from synapse.util import json_decoder
 from synapse.util.cancellation import cancellable
@@ -140,7 +140,7 @@ class TransactionRestServlet(RestServlet):
 
 
 class RoomCreateRestServlet(TransactionRestServlet):
-    # No PATTERN; we have custom dispatch rules here
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
@@ -151,15 +151,22 @@ class RoomCreateRestServlet(TransactionRestServlet):
         PATTERNS = "/createRoom"
         register_txn_path(self, PATTERNS, http_server)
 
-    def on_PUT(
+    async def on_PUT(
         self, request: SynapseRequest, txn_id: str
-    ) -> Awaitable[Tuple[int, JsonDict]]:
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
         set_tag("txn_id", txn_id)
-        return self.txns.fetch_or_execute_request(request, self.on_POST, request)
+        return await self.txns.fetch_or_execute_request(
+            request, requester, self._do, request, requester
+        )
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
+        return await self._do(request, requester)
 
+    async def _do(
+        self, request: SynapseRequest, requester: Requester
+    ) -> Tuple[int, JsonDict]:
         room_id, _, _ = await self._room_creation_handler.create_room(
             requester, self.get_room_config(request)
         )
@@ -172,9 +179,11 @@ class RoomCreateRestServlet(TransactionRestServlet):
 
 
 # TODO: Needs unit testing for generic events
-class RoomStateEventRestServlet(TransactionRestServlet):
+class RoomStateEventRestServlet(RestServlet):
+    CATEGORY = "Event sending requests"
+
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        super().__init__()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.message_handler = hs.get_message_handler()
@@ -316,6 +325,8 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 
 # TODO: Needs unit testing for generic events + feedback
 class RoomSendEventRestServlet(TransactionRestServlet):
+    CATEGORY = "Event sending requests"
+
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -324,16 +335,16 @@ class RoomSendEventRestServlet(TransactionRestServlet):
     def register(self, http_server: HttpServer) -> None:
         # /rooms/$roomid/send/$event_type[/$txn_id]
         PATTERNS = "/rooms/(?P<room_id>[^/]*)/send/(?P<event_type>[^/]*)"
-        register_txn_path(self, PATTERNS, http_server, with_get=True)
+        register_txn_path(self, PATTERNS, http_server)
 
-    async def on_POST(
+    async def _do(
         self,
         request: SynapseRequest,
+        requester: Requester,
         room_id: str,
         event_type: str,
-        txn_id: Optional[str] = None,
+        txn_id: Optional[str],
     ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         content = parse_json_object_from_request(request)
 
         event_dict: JsonDict = {
@@ -362,23 +373,37 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         set_tag("event_id", event_id)
         return 200, {"event_id": event_id}
 
-    def on_GET(
-        self, request: SynapseRequest, room_id: str, event_type: str, txn_id: str
-    ) -> Tuple[int, str]:
-        return 200, "Not implemented"
+    async def on_POST(
+        self,
+        request: SynapseRequest,
+        room_id: str,
+        event_type: str,
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        return await self._do(request, requester, room_id, event_type, None)
 
-    def on_PUT(
+    async def on_PUT(
         self, request: SynapseRequest, room_id: str, event_type: str, txn_id: str
-    ) -> Awaitable[Tuple[int, JsonDict]]:
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         set_tag("txn_id", txn_id)
 
-        return self.txns.fetch_or_execute_request(
-            request, self.on_POST, request, room_id, event_type, txn_id
+        return await self.txns.fetch_or_execute_request(
+            request,
+            requester,
+            self._do,
+            request,
+            requester,
+            room_id,
+            event_type,
+            txn_id,
         )
 
 
 # TODO: Needs unit testing for room ID + alias joins
 class JoinRoomAliasServlet(ResolveRoomIdMixin, TransactionRestServlet):
+    CATEGORY = "Event sending requests"
+
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         super(ResolveRoomIdMixin, self).__init__(hs)  # ensure the Mixin is set up
@@ -389,14 +414,13 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, TransactionRestServlet):
         PATTERNS = "/join/(?P<room_identifier>[^/]*)"
         register_txn_path(self, PATTERNS, http_server)
 
-    async def on_POST(
+    async def _do(
         self,
         request: SynapseRequest,
+        requester: Requester,
         room_identifier: str,
-        txn_id: Optional[str] = None,
+        txn_id: Optional[str],
     ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request, allow_guest=True)
-
         content = parse_json_object_from_request(request, allow_empty_body=True)
 
         # twisted.web.server.Request.args is incorrectly defined as Optional[Any]
@@ -420,22 +444,32 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, TransactionRestServlet):
 
         return 200, {"room_id": room_id}
 
-    def on_PUT(
+    async def on_POST(
+        self,
+        request: SynapseRequest,
+        room_identifier: str,
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        return await self._do(request, requester, room_identifier, None)
+
+    async def on_PUT(
         self, request: SynapseRequest, room_identifier: str, txn_id: str
-    ) -> Awaitable[Tuple[int, JsonDict]]:
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         set_tag("txn_id", txn_id)
 
-        return self.txns.fetch_or_execute_request(
-            request, self.on_POST, request, room_identifier, txn_id
+        return await self.txns.fetch_or_execute_request(
+            request, requester, self._do, request, requester, room_identifier, txn_id
         )
 
 
 # TODO: Needs unit testing
-class PublicRoomListRestServlet(TransactionRestServlet):
+class PublicRoomListRestServlet(RestServlet):
     PATTERNS = client_patterns("/publicRooms$", v1=True)
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
 
@@ -551,6 +585,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
 # TODO: Needs unit testing
 class RoomMemberListRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/members$", v1=True)
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -606,6 +641,7 @@ class RoomMemberListRestServlet(RestServlet):
 # except it does custom AS logic and has a simpler return format
 class JoinedRoomMemberListRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/joined_members$", v1=True)
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -627,6 +663,10 @@ class JoinedRoomMemberListRestServlet(RestServlet):
 # TODO: Needs better unit testing
 class RoomMessageListRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/messages$", v1=True)
+    # TODO The routing information should be exposed programatically.
+    #      I want to do this but for now I felt bad about leaving this without
+    #      at least a visible warning on it.
+    CATEGORY = "Client API requests (ALL FOR SAME ROOM MUST GO TO SAME WORKER)"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -693,6 +733,7 @@ class RoomMessageListRestServlet(RestServlet):
 # TODO: Needs unit testing
 class RoomStateRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/state$", v1=True)
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -715,6 +756,7 @@ class RoomStateRestServlet(RestServlet):
 # TODO: Needs unit testing
 class RoomInitialSyncRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/initialSync$", v1=True)
+    CATEGORY = "Sync requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -739,6 +781,7 @@ class RoomEventServlet(RestServlet):
     PATTERNS = client_patterns(
         "/rooms/(?P<room_id>[^/]*)/event/(?P<event_id>[^/]*)$", v1=True
     )
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -831,6 +874,7 @@ class RoomEventContextServlet(RestServlet):
     PATTERNS = client_patterns(
         "/rooms/(?P<room_id>[^/]*)/context/(?P<event_id>[^/]*)$", v1=True
     )
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -907,27 +951,32 @@ class RoomForgetRestServlet(TransactionRestServlet):
         PATTERNS = "/rooms/(?P<room_id>[^/]*)/forget"
         register_txn_path(self, PATTERNS, http_server)
 
-    async def on_POST(
-        self, request: SynapseRequest, room_id: str, txn_id: Optional[str] = None
-    ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request, allow_guest=False)
-
+    async def _do(self, requester: Requester, room_id: str) -> Tuple[int, JsonDict]:
         await self.room_member_handler.forget(user=requester.user, room_id=room_id)
 
         return 200, {}
 
-    def on_PUT(
+    async def on_POST(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request, allow_guest=False)
+        return await self._do(requester, room_id)
+
+    async def on_PUT(
         self, request: SynapseRequest, room_id: str, txn_id: str
-    ) -> Awaitable[Tuple[int, JsonDict]]:
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request, allow_guest=False)
         set_tag("txn_id", txn_id)
 
-        return self.txns.fetch_or_execute_request(
-            request, self.on_POST, request, room_id, txn_id
+        return await self.txns.fetch_or_execute_request(
+            request, requester, self._do, requester, room_id
         )
 
 
 # TODO: Needs unit testing
 class RoomMembershipRestServlet(TransactionRestServlet):
+    CATEGORY = "Event sending requests"
+
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
@@ -941,15 +990,14 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         )
         register_txn_path(self, PATTERNS, http_server)
 
-    async def on_POST(
+    async def _do(
         self,
         request: SynapseRequest,
+        requester: Requester,
         room_id: str,
         membership_action: str,
-        txn_id: Optional[str] = None,
+        txn_id: Optional[str],
     ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request, allow_guest=True)
-
         if requester.is_guest and membership_action not in {
             Membership.JOIN,
             Membership.LEAVE,
@@ -1014,21 +1062,41 @@ class RoomMembershipRestServlet(TransactionRestServlet):
 
         return 200, return_value
 
-    def on_PUT(
+    async def on_POST(
+        self,
+        request: SynapseRequest,
+        room_id: str,
+        membership_action: str,
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        return await self._do(request, requester, room_id, membership_action, None)
+
+    async def on_PUT(
         self, request: SynapseRequest, room_id: str, membership_action: str, txn_id: str
-    ) -> Awaitable[Tuple[int, JsonDict]]:
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         set_tag("txn_id", txn_id)
 
-        return self.txns.fetch_or_execute_request(
-            request, self.on_POST, request, room_id, membership_action, txn_id
+        return await self.txns.fetch_or_execute_request(
+            request,
+            requester,
+            self._do,
+            request,
+            requester,
+            room_id,
+            membership_action,
+            txn_id,
         )
 
 
 class RoomRedactEventRestServlet(TransactionRestServlet):
+    CATEGORY = "Event sending requests"
+
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.event_creation_handler = hs.get_event_creation_handler()
         self.auth = hs.get_auth()
+        self._store = hs.get_datastores().main
         self._relation_handler = hs.get_relations_handler()
         self._msc3912_enabled = hs.config.experimental.msc3912_enabled
 
@@ -1036,15 +1104,28 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
         PATTERNS = "/rooms/(?P<room_id>[^/]*)/redact/(?P<event_id>[^/]*)"
         register_txn_path(self, PATTERNS, http_server)
 
-    async def on_POST(
+    async def _do(
         self,
         request: SynapseRequest,
+        requester: Requester,
         room_id: str,
         event_id: str,
-        txn_id: Optional[str] = None,
+        txn_id: Optional[str],
     ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
         content = parse_json_object_from_request(request)
+
+        # Ensure the redacts property in the content matches the one provided in
+        # the URL.
+        room_version = await self._store.get_room_version(room_id)
+        if room_version.msc2176_redaction_rules:
+            if "redacts" in content and content["redacts"] != event_id:
+                raise SynapseError(
+                    400,
+                    "Cannot provide a redacts value incoherent with the event_id of the URL parameter",
+                    Codes.INVALID_PARAM,
+                )
+            else:
+                content["redacts"] = event_id
 
         try:
             with_relations = None
@@ -1061,20 +1142,23 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
                     requester, txn_id, room_id
                 )
 
+            # Event is not yet redacted, create a new event to redact it.
             if event is None:
+                event_dict = {
+                    "type": EventTypes.Redaction,
+                    "content": content,
+                    "room_id": room_id,
+                    "sender": requester.user.to_string(),
+                }
+                # Earlier room versions had a top-level redacts property.
+                if not room_version.msc2176_redaction_rules:
+                    event_dict["redacts"] = event_id
+
                 (
                     event,
                     _,
                 ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                    requester,
-                    {
-                        "type": EventTypes.Redaction,
-                        "content": content,
-                        "room_id": room_id,
-                        "sender": requester.user.to_string(),
-                        "redacts": event_id,
-                    },
-                    txn_id=txn_id,
+                    requester, event_dict, txn_id=txn_id
                 )
 
                 if with_relations:
@@ -1094,13 +1178,23 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
         set_tag("event_id", event_id)
         return 200, {"event_id": event_id}
 
-    def on_PUT(
+    async def on_POST(
+        self,
+        request: SynapseRequest,
+        room_id: str,
+        event_id: str,
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
+        return await self._do(request, requester, room_id, event_id, None)
+
+    async def on_PUT(
         self, request: SynapseRequest, room_id: str, event_id: str, txn_id: str
-    ) -> Awaitable[Tuple[int, JsonDict]]:
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
         set_tag("txn_id", txn_id)
 
-        return self.txns.fetch_or_execute_request(
-            request, self.on_POST, request, room_id, event_id, txn_id
+        return await self.txns.fetch_or_execute_request(
+            request, requester, self._do, request, requester, room_id, event_id, txn_id
         )
 
 
@@ -1108,6 +1202,7 @@ class RoomTypingRestServlet(RestServlet):
     PATTERNS = client_patterns(
         "/rooms/(?P<room_id>[^/]*)/typing/(?P<user_id>[^/]*)$", v1=True
     )
+    CATEGORY = "The typing stream"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -1139,7 +1234,7 @@ class RoomTypingRestServlet(RestServlet):
         # Limit timeout to stop people from setting silly typing timeouts.
         timeout = min(content.get("timeout", 30000), 120000)
 
-        # Defer getting the typing handler since it will raise on workers.
+        # Defer getting the typing handler since it will raise on WORKER_PATTERNS.
         typing_handler = self.hs.get_typing_writer_handler()
 
         try:
@@ -1168,6 +1263,7 @@ class RoomAliasListServlet(RestServlet):
             r"/rooms/(?P<room_id>[^/]*)/aliases"
         ),
     ] + list(client_patterns("/rooms/(?P<room_id>[^/]*)/aliases$", unstable=False))
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -1188,6 +1284,7 @@ class RoomAliasListServlet(RestServlet):
 
 class SearchRestServlet(RestServlet):
     PATTERNS = client_patterns("/search$", v1=True)
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -1207,6 +1304,7 @@ class SearchRestServlet(RestServlet):
 
 class JoinedRoomsRestServlet(RestServlet):
     PATTERNS = client_patterns("/joined_rooms$", v1=True)
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -1224,7 +1322,6 @@ def register_txn_path(
     servlet: RestServlet,
     regex_string: str,
     http_server: HttpServer,
-    with_get: bool = False,
 ) -> None:
     """Registers a transaction-based path.
 
@@ -1236,7 +1333,6 @@ def register_txn_path(
         regex_string: The regex string to register. Must NOT have a
             trailing $ as this string will be appended to.
         http_server: The http_server to register paths with.
-        with_get: True to also register respective GET paths for the PUTs.
     """
     on_POST = getattr(servlet, "on_POST", None)
     on_PUT = getattr(servlet, "on_PUT", None)
@@ -1254,18 +1350,6 @@ def register_txn_path(
         on_PUT,
         servlet.__class__.__name__,
     )
-    on_GET = getattr(servlet, "on_GET", None)
-    if with_get:
-        if on_GET is None:
-            raise RuntimeError(
-                "register_txn_path called with with_get = True, but no on_GET method exists"
-            )
-        http_server.register_paths(
-            "GET",
-            client_patterns(regex_string + "/(?P<txn_id>[^/]*)$", v1=True),
-            on_GET,
-            servlet.__class__.__name__,
-        )
 
 
 class TimestampLookupRestServlet(RestServlet):
@@ -1292,6 +1376,7 @@ class TimestampLookupRestServlet(RestServlet):
     PATTERNS = (
         re.compile("^/_matrix/client/v1/rooms/(?P<room_id>[^/]*)/timestamp_to_event$"),
     )
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -1323,6 +1408,8 @@ class TimestampLookupRestServlet(RestServlet):
 
 class RoomHierarchyRestServlet(RestServlet):
     PATTERNS = (re.compile("^/_matrix/client/v1/rooms/(?P<room_id>[^/]*)/hierarchy$"),)
+    WORKERS = PATTERNS
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -1363,6 +1450,7 @@ class RoomSummaryRestServlet(ResolveRoomIdMixin, RestServlet):
             "/rooms/(?P<room_identifier>[^/]*)/summary$"
         ),
     )
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)

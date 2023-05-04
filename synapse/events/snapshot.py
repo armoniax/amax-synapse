@@ -15,7 +15,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
 import attr
-from frozendict import frozendict
+from immutabledict import immutabledict
 
 from synapse.appservice import ApplicationService
 from synapse.events import EventBase
@@ -293,6 +293,7 @@ class EventContext(UnpersistedEventContextBase):
             Maps a (type, state_key) to the event ID of the state event matching
             this tuple.
         """
+
         assert self.state_group_before_event is not None
         return await self._storage.state.get_state_ids_for_group(
             self.state_group_before_event, state_filter
@@ -488,4 +489,4 @@ def _decode_state_dict(
     if input is None:
         return None
 
-    return frozendict({(etype, state_key): v for etype, state_key, v in input})
+    return immutabledict({(etype, state_key): v for etype, state_key, v in input})
