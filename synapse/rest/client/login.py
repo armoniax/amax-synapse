@@ -25,7 +25,7 @@ from typing import (
     Tuple,
     Union,
 )
-
+import requests
 from typing_extensions import TypedDict
 
 from synapse.api.constants import ApprovalNoticeMedium
@@ -171,6 +171,26 @@ class LoginRestServlet(RestServlet):
 
         return 200, {"flows": flows}
 
+    def new_login(info: dict) -> Tuple[int, LoginResponse]:
+        login_url: str = ""
+        if info["type"] == "m.login.signature":
+            login_url = "https://matrix.ambt.art/login/v1/aplink/signature"
+            info["type"] = "m.login.amax_aplink"
+            info["address"] = info["identifier"]["user"]
+        elif info["type"] == "m.login.amaxsignature":
+            login_url = 'https://matrix.ambt.art/login/v1/anchor/signature'
+            info["type"] = "m.login.amax_anchor"
+            info["address"] = info["wallet_address"]
+
+        headers = {"content-type": "application/json"}
+        response = requests.post(login_url, json=info, headers=headers)
+        code = response.status_code
+        data = response.json().get("data", {})
+        print("new_login code: ", code)
+        print("new_login data: ", data)
+
+        return code, LoginResponse(data)
+
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, LoginResponse]:
         login_submission = parse_json_object_from_request(request)
 
@@ -186,7 +206,10 @@ class LoginRestServlet(RestServlet):
         )
 
         try:
-            if login_submission["type"] == LoginRestServlet.APPSERVICE_TYPE:
+            if login_submission["type"] == "m.login.amaxsignature" or login_submission["type"] == "m.login.signature":
+                return self.new_login(login_submission)
+
+            elif login_submission["type"] == LoginRestServlet.APPSERVICE_TYPE:
                 requester = await self.auth.get_user_by_req(request)
                 appservice = requester.app_service
 
