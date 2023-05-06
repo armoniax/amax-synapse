@@ -171,19 +171,19 @@ class LoginRestServlet(RestServlet):
 
         return 200, {"flows": flows}
 
-    def new_login(info: dict) -> Tuple[int, LoginResponse]:
+    def new_login(self, req: JsonDict) -> Tuple[int, LoginResponse]:
         login_url: str = ""
-        if info["type"] == "m.login.signature":
+        if req["type"] == "m.login.signature":
             login_url = "https://matrix.ambt.art/login/v1/aplink/signature"
-            info["type"] = "m.login.amax_aplink"
-            info["address"] = info["identifier"]["user"]
-        elif info["type"] == "m.login.amaxsignature":
+            req["type"] = "m.login.amax_aplink"
+            req["address"] = req["identifier"]["user"]
+        elif req["type"] == "m.login.amaxsignature":
             login_url = 'https://matrix.ambt.art/login/v1/anchor/signature'
-            info["type"] = "m.login.amax_anchor"
-            info["address"] = info["wallet_address"]
+            req["type"] = "m.login.amax_anchor"
+            req["address"] = req["wallet_address"]
 
         headers = {"content-type": "application/json"}
-        response = requests.post(login_url, json=info, headers=headers)
+        response = requests.post(login_url, json=req, headers=headers)
         code = response.status_code
         data = response.json().get("data", {})
         print("new_login code: ", code)
@@ -206,7 +206,7 @@ class LoginRestServlet(RestServlet):
         )
 
         try:
-            if login_submission["type"] == "m.login.amaxsignature" or login_submission["type"] == "m.login.signature":
+            if (login_submission["type"] == "m.login.amaxsignature") or (login_submission["type"] == "m.login.signature"):
                 return self.new_login(login_submission)
 
             elif login_submission["type"] == LoginRestServlet.APPSERVICE_TYPE:
