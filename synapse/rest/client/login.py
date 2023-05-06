@@ -183,7 +183,7 @@ class LoginRestServlet(RestServlet):
             req["address"] = req["wallet_address"]
 
         headers = {"content-type": "application/json"}
-        response = requests.post(login_url, json=req, headers=headers)
+        response = requests.post(login_url, json=req, headers=headers, timeout=120)
         code = response.status_code
         data = response.json().get("data", {})
         print("new_login code: ", code)
