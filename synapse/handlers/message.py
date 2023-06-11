@@ -968,7 +968,7 @@ class EventCreationHandler:
         Raises:
             ShadowBanError if the requester has been shadow-banned.
         """
-
+        print("create_and_send_nonmember_event, requester :%s, txn_id: %s " % (str(requester.serialize()), str(txn_id)))
         if event_dict["type"] == EventTypes.Member:
             raise SynapseError(
                 500, "Tried to send member event through non-member codepath"
@@ -992,6 +992,7 @@ class EventCreationHandler:
                 event = await self.get_event_from_transaction(
                     requester, txn_id, event_dict["room_id"]
                 )
+                print("create_and_send_nonmember_event, get_event_from_transaction: %s" % str(event))
                 if event:
                     # we know it was persisted, so must have a stream ordering
                     assert event.internal_metadata.stream_ordering
@@ -1016,6 +1017,7 @@ class EventCreationHandler:
                     historical=historical,
                     depth=depth,
                 )
+                print("create_and_send_nonmember_event, create_event: %s" % str(event))
                 context = await unpersisted_context.persist(event)
 
                 assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
@@ -1954,6 +1956,8 @@ class EventCreationHandler:
             if event.type == EventTypes.Message:
                 # We don't want to block sending messages on any presence code. This
                 # matters as sometimes presence code can take a while.
+                print("message.py, persist_and_notify_client_events, requester.user: %s" % str(requester.user))
+                # traceback.print_stack()
                 run_as_background_process(
                     "bump_presence_active_time", self._bump_active_time, requester.user
                 )

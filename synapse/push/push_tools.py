@@ -56,9 +56,11 @@ async def get_context_for_event(
     # we no longer bother setting room_alias, and make room_name the
     # human-readable name instead, be that m.room.name, an alias or
     # a list of people in the room
+    print("get_context_for_event, ev: %s, " % str(ev))
     name = await calculate_room_name(
         storage.main, room_state_ids, user_id, fallback_to_single_member=False
     )
+    print("calculate_room_name, name: %s, " % str(name))
     if name:
         ctx["name"] = name
 

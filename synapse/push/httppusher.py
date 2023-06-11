@@ -127,6 +127,7 @@ class HttpPusher(Pusher):
             raise PusherConfigException("'url' required in data for HTTP pusher")
 
         url = self.data["url"]
+        print("HttpPusher, __init__,  url: %s" % url)
         if not isinstance(url, str):
             raise PusherConfigException("'url' must be a string")
         url_parts = urllib.parse.urlparse(url)
@@ -152,6 +153,7 @@ class HttpPusher(Pusher):
                 check for push to send. Set to False only if it's known there
                 is nothing to send
         """
+        print("httppuser.py, on_started, self.user_id:%s, should_check_for_notifs: %s" % (self.user_id, should_check_for_notifs))
         if should_check_for_notifs:
             self._start_processing()
 
@@ -192,6 +194,7 @@ class HttpPusher(Pusher):
         run_as_background_process("httppush.process", self._process)
 
     async def _process(self) -> None:
+        print("httppusher.py, _process, self._is_processing: %s" % str(self._is_processing))
         # we should never get here if we are already processing
         assert not self._is_processing
 
@@ -216,6 +219,7 @@ class HttpPusher(Pusher):
         Never call this directly: use _process which will only allow this to
         run once per pusher.
         """
+        ## TODO unprocessed为空.
         unprocessed = (
             await self.store.get_unread_push_actions_for_user_in_range_for_http(
                 self.user_id, self.last_stream_ordering, self.max_stream_ordering
@@ -311,6 +315,7 @@ class HttpPusher(Pusher):
                     break
 
     async def _process_one(self, push_action: HttpPushAction) -> bool:
+        print("_process_one, push_action: %s, " % str(push_action))
         if "notify" not in push_action.actions:
             return True
 
@@ -345,6 +350,7 @@ class HttpPusher(Pusher):
     async def _build_notification_dict(
         self, event: EventBase, tweaks: Dict[str, bool], badge: int
     ) -> Dict[str, Any]:
+        print("_build_notification_dict, event: %s, badge: %s, tweaks: %s" % (str(event), badge, str(tweaks)))
         priority = "low"
         if (
             event.type == EventTypes.Encrypted
@@ -428,6 +434,8 @@ class HttpPusher(Pusher):
             resp = await self.http_client.post_json_get_json(
                 self.url, notification_dict
             )
+            print("dispatch_push, self.url: %s, self.name: %s, notification_dict: %s, resp: %s."
+                  % (self.url, self.name, str(notification_dict), str(resp)))
         except Exception as e:
             logger.warning(
                 "Failed to push event %s to %s: %s %s",
@@ -436,6 +444,9 @@ class HttpPusher(Pusher):
                 type(e),
                 e,
             )
+            print("dispatch_push, self.url: %s, notification_dict: %s,"
+                  " Failed to push event %s to %s: %s %s."
+                  % (self.url, str(notification_dict), event.event_id, self.name, type(e), e,))
             return False
         rejected = []
         if "rejected" in resp:

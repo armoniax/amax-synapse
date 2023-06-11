@@ -16,7 +16,6 @@ from typing import TYPE_CHECKING, Optional, Tuple
 
 import pymacaroons
 from netaddr import IPAddress
-
 from twisted.web.server import Request
 
 from synapse import event_auth
@@ -535,6 +534,7 @@ class Auth:
 
         auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
         query_params = request.args.get(b"access_token")
+        print("auth_headers: %s, query_params: %s, uri: %s" % (str(auth_headers), str(query_params), request.uri))
         if auth_headers:
             # Try the get the access_token from a "Authorization: Bearer"
             # header

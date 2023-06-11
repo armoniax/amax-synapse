@@ -355,6 +355,8 @@ class PusherPool:
         Returns:
             The newly created pusher or None.
         """
+        print("pusherpool.py, _start_pusher, set up %s's pusher, push app id : %s, push url: %s, push format: %s"
+              % (pusher_config.user_name, pusher_config.app_id, pusher_config.data.get('url'), pusher_config.data.get('format')))
         if not self._pusher_shard_config.should_handle(
             self._instance_name, pusher_config.user_name
         ):
@@ -385,6 +387,8 @@ class PusherPool:
         appid_pushkey = "%s:%s" % (pusher.app_id, pusher.pushkey)
 
         byuser = self.pushers.setdefault(pusher.user_id, {})
+        print("puserpool.py, _start_pusher, self.pushers's size : %s" % len(self.pushers))
+
         if appid_pushkey in byuser:
             previous_pusher = byuser[appid_pushkey]
             previous_pusher.on_stop()
@@ -411,14 +415,15 @@ class PusherPool:
             # We always want to default to starting up the pusher rather than
             # risk missing push.
             have_notifs = True
-
-        pusher.on_started(have_notifs)
+        print("pusherpool.py, _start_pusher, user: %s, have_notifs: %s." % (pusher.user_id, have_notifs))
+        pusher.on_started(True)
 
         return pusher
 
     async def remove_pusher(self, app_id: str, pushkey: str, user_id: str) -> None:
         self.maybe_stop_pusher(app_id, pushkey, user_id)
 
+        print("pusherpool.py, remove_pusher, user_id: %s." % user_id)
         # We can only delete pushers on master.
         if self._remove_pusher_client:
             await self._remove_pusher_client(

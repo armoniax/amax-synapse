@@ -30,7 +30,6 @@ from typing import (
 
 import attr
 from prometheus_client import Counter
-
 from twisted.internet import defer
 
 from synapse.api.constants import EduTypes, EventTypes, HistoryVisibility, Membership
@@ -237,6 +236,7 @@ class Notifier:
         self.clock = hs.get_clock()
         self.appservice_handler = hs.get_application_service_handler()
         self._pusher_pool = hs.get_pusherpool()
+        print("Notifier, __init__, pusher pool size: %s" % len(self._pusher_pool.pushers))
 
         self.federation_sender = None
         if hs.should_send_federation():
